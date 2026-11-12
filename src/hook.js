@@ -240,6 +240,13 @@ export async function decideHook({ agent, command, cwd, session }, deps) {
       if (err.status === 401) {
         return { kind: 'deny', reason: `Hibira Approvals refused this computer's sign-in (it may have been disconnected). Ask the user to run \`${LOGIN}\` again, then retry the same command.` };
       }
+      if (err.status === 402) {
+        return {
+          kind: 'deny',
+          reason: 'The Hibira Approvals workspace has used up its approval requests for this month, so this command was not run. Tell the user; do not try another way to do the same thing.',
+          userMessage: 'Hibira Approvals: this workspace is out of approval requests for the month. A workspace admin can upgrade the plan, or add safe commands to the "never" list in ~/.config/hibira/approval-hook.json.',
+        };
+      }
       return { kind: 'deny', reason: `Could not ask for approval (${err.message}), so the command was not run. Tell the user; do not try another way.` };
     }
     entry = { status: 'pending', id: created.approval_id, url: created.url, expiresAt: created.expires_at };

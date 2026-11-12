@@ -235,6 +235,11 @@ command run once in that folder. A rejection (with its comment) goes back to
 the agent with an instruction to stop; if nobody answers within 10 minutes the
 agent is told to wait and run the same command again later.
 
+Commands are checked on your computer: only the ones that wait create a
+request (and count toward the workspace's monthly requests). When the month's
+requests are used up, risky commands stay blocked and the agent says why;
+nothing is let through unasked.
+
 **Install.** Connect this computer to your workspace once:
 
 ```sh

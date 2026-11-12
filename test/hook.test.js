@@ -97,6 +97,14 @@ test('app keys without push: the link goes to the person, not a wait', async () 
   assert.equal(approvals.calls.get.length, 0);
 });
 
+test('an exhausted quota blocks and says why', async () => {
+  const approvals = fakeApprovals([]);
+  approvals.create = async () => { throw Object.assign(new Error('approvals_quota'), { status: 402 }); };
+  const d = await decideHook(input, { settings: settings(), approvals, state: new MemState(), git });
+  assert.equal(d.kind, 'deny');
+  assert.match(d.reason, /used up/);
+});
+
 test('API errors fail closed', async () => {
   const approvals = fakeApprovals([]);
   approvals.create = async () => { throw Object.assign(new Error('boom'), { status: 500 }); };
