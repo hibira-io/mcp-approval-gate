@@ -1,5 +1,6 @@
 // mcp-approval-gate hook: a command hook for coding agents (Claude Code
-// PreToolUse, Codex PreToolUse, Cursor beforeShellExecution). Risky shell
+// PreToolUse, Codex PreToolUse, Cursor beforeShellExecution, Hermes Agent
+// pre_tool_call). Risky shell
 // commands wait until a second person approves them in a Hibira Approvals
 // workspace; everything else runs as usual.
 
@@ -12,12 +13,13 @@ import { classifyShell } from './shell.js';
 import { ApprovalsClient } from './hibira.js';
 import { TokenStore, WorkspaceClient, configPath, DEFAULT_URL } from './connect.js';
 
-export const AGENTS = { claude: 'Claude Code', codex: 'Codex', cursor: 'Cursor' };
+export const AGENTS = { claude: 'Claude Code', codex: 'Codex', cursor: 'Cursor', hermes: 'Hermes Agent' };
 const LOGIN = 'npx -y @hibira-io/mcp-approval-gate login --label "coding agent"';
 const REJECT_MEMORY_MS = 15 * 60 * 1000;
+const HERMES_MAX_WAIT = 280;
 
 const HELP = `Usage:
-  mcp-approval-gate hook [claude|codex|cursor]   run as the agent's hook (reads the hook JSON on stdin)
+  mcp-approval-gate hook [claude|codex|cursor|hermes]   run as the agent's hook (reads the hook JSON on stdin)
   mcp-approval-gate hook check -- <command...>   show whether a command would wait for approval
 
 Shell commands that delete files, force-push, deploy, change infrastructure,
@@ -86,14 +88,15 @@ export function readInput(input, client) {
   if (!input || typeof input !== 'object') return {};
   let agent = client;
   if (!agent) {
-    if (input.hook_event_name === 'beforeShellExecution' || (typeof input.command === 'string' && !input.tool_name)) agent = 'cursor';
+    if (input.hook_event_name === 'pre_tool_call') agent = 'hermes';
+    else if (input.hook_event_name === 'beforeShellExecution' || (typeof input.command === 'string' && !input.tool_name)) agent = 'cursor';
     else if ('turn_id' in input) agent = 'codex';
     else agent = 'claude';
   }
   if (agent === 'cursor') {
     return { agent, command: typeof input.command === 'string' ? input.command : undefined, cwd: input.cwd || process.cwd() };
   }
-  const shellTool = /^(Bash|Shell|shell|exec_command|local_shell|run_terminal_cmd)$/.test(input.tool_name ?? '');
+  const shellTool = /^(Bash|Shell|shell|exec_command|local_shell|run_terminal_cmd|terminal)$/.test(input.tool_name ?? '');
   let command = input.tool_input?.command;
   if (Array.isArray(command)) command = command.join(' ');
   return {
@@ -109,6 +112,7 @@ export function render(agent, { kind, reason, userMessage }) {
     if (kind === 'deny') return { permission: 'deny', user_message: userMessage ?? reason, agent_message: reason };
     return kind === 'approved' ? { permission: 'allow', user_message: userMessage } : { permission: 'allow' };
   }
+  if (agent === 'hermes') return kind === 'deny' ? { action: 'block', message: reason } : undefined;
   if (kind === 'pass') return undefined;
   if (kind === 'approved') return userMessage ? { systemMessage: userMessage } : undefined;
   const out = { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason } };
@@ -337,6 +341,8 @@ export async function runHook(argv, env = process.env) {
     const input = readInput(JSON.parse(await readStdin()), client);
     agent = input.agent ?? agent;
     const settings = loadSettings(env, input.cwd);
+    // Hermes stops a hook after 300 seconds at most; answer before that.
+    if (agent === 'hermes') settings.waitSeconds = Math.min(settings.waitSeconds, HERMES_MAX_WAIT);
     const needs = input.command && settings.enabled && classifyShell(input.command, settings).gate;
     const decision = needs
       ? await decideHook(input, { settings, approvals: approvalsFromEnv(env, settings), state: new State(statePath(env)) })

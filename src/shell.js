@@ -483,7 +483,10 @@ function rule(argv, cmd) {
       if (sub === 'versions' && argv[2] === 'deploy') return { label: 'wrangler versions deploy', kind: 'deploy' };
       if (sub === 'pages' && argv[2] === 'deploy' && !flagValues(argv, ['--branch']).some((b) => b !== 'main' && b !== 'master' && b !== 'production')) return { label: 'wrangler pages deploy', kind: 'deploy' };
       if (sub === 'secret' && ['put', 'delete', 'bulk'].includes(argv[2])) return { label: `wrangler secret ${argv[2]}`, kind: 'secrets' };
-      if (['kv', 'kv:key', 'kv:namespace', 'r2', 'queues', 'd1', 'vectorize', 'hyperdrive'].includes(sub) && argv.some((x) => /^(delete|purge|bulk|put)$/.test(x))) return { label: `wrangler ${sub} delete`, kind: 'database' };
+      if (['kv', 'kv:key', 'kv:namespace', 'r2', 'queues', 'd1', 'vectorize', 'hyperdrive'].includes(sub)) {
+        const verb = argv.find((x) => /^(delete|purge|bulk|put)$/.test(x));
+        if (verb) return { label: `wrangler ${sub} ${verb}`, kind: 'database' };
+      }
       if (sub === 'd1' && argv[2] === 'execute' && argv.includes('--remote')) {
         const sql = flagValues(argv, ['--command']);
         if (!sql.length) return { label: 'wrangler d1 execute --remote from a file', kind: 'database' };

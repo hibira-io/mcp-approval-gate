@@ -117,6 +117,10 @@ test('reads Claude Code, Codex and Cursor input', () => {
   assert.equal(readInput({ tool_name: 'Bash', tool_input: { command: 'ls' }, turn_id: 't' }).agent, 'codex');
   assert.equal(readInput({ command: 'ls', cwd: '/a', hook_event_name: 'beforeShellExecution' }).agent, 'cursor');
   assert.equal(readInput({ tool_name: 'Edit', tool_input: { file_path: 'x' } }).command, undefined);
+  const hermes = readInput({ hook_event_name: 'pre_tool_call', tool_name: 'terminal', tool_input: { command: 'rm -rf build' }, cwd: '/w', profile: 'default' });
+  assert.equal(hermes.agent, 'hermes');
+  assert.equal(hermes.command, 'rm -rf build');
+  assert.equal(readInput({ hook_event_name: 'pre_tool_call', tool_name: 'write_file', tool_input: { path: 'x' } }).command, undefined);
 });
 
 test('renders each agent\'s answer', () => {
@@ -125,6 +129,9 @@ test('renders each agent\'s answer', () => {
   assert.deepEqual(render('cursor', { kind: 'pass' }), { permission: 'allow' });
   assert.equal(render('codex', { kind: 'deny', reason: 'r' }).hookSpecificOutput.permissionDecision, 'deny');
   assert.equal(render('cursor', { kind: 'deny', reason: 'r', userMessage: 'u' }).agent_message, 'r');
+  assert.equal(render('hermes', { kind: 'pass' }), undefined);
+  assert.equal(render('hermes', { kind: 'approved', userMessage: 'u' }), undefined);
+  assert.deepEqual(render('hermes', { kind: 'deny', reason: 'r', userMessage: 'u' }), { action: 'block', message: 'r' });
 });
 
 test('request body stays inside the API limits', () => {

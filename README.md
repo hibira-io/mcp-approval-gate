@@ -242,7 +242,7 @@ user only the rights it needs too.
 
 ## Coding agents: approval before risky shell commands
 
-The same package is a hook for **Claude Code, Codex and Cursor**. Shell
+The same package is a hook for **Claude Code, Codex, Cursor and Hermes Agent**. Shell
 commands that are hard to take back wait until a second person in your Hibira
 Approvals workspace approves them; everything else runs as usual.
 
@@ -305,6 +305,20 @@ Cursor install the same plugin). Or add it by hand:
   { "version": 1, "hooks": { "beforeShellExecution": [
     { "command": "npx -y @hibira-io/mcp-approval-gate hook cursor", "timeout": 660, "failClosed": true }
   ] } }
+  ```
+
+- **Hermes Agent**, `~/.hermes/config.yaml` (Hermes waits at most 300 seconds
+  for a hook, so the hook stops waiting after 280 and tells the agent to retry
+  once it is approved). The [Hibira Hermes container](https://github.com/hibira-io/hermes)
+  comes with this set up:
+
+  ```yaml
+  hooks:
+    pre_tool_call:
+      - matcher: "terminal"
+        command: "mcp-approval-gate hook hermes"
+        timeout: 300
+        fail_closed: true
   ```
 
 For a faster start on every command, install it once with
@@ -386,4 +400,4 @@ MIT
 - Gate 跑在你自己的环境，Hibira 只经手审批内容，不碰数据库密码，也看不到查询结果。
 - Claude（Desktop / Code / claude.ai）、Cursor、ChatGPT 都能用；网页端用 `--http` 加 `GATE_TOKEN`。
 - 设定：在 hibira.io 建立 Approvals 工作区并邀请审批人；设定里只要在 `--` 后面接原本的数据库 MCP 指令，不用复制任何 Key。第一次要写入时，助手会给一个连接链接和代码，由工作区管理员登入后按「连接」即可（也可先执行 `npx -y @hibira-io/mcp-approval-gate login`）。
-- **编码代理审批钩子（Claude Code / Codex / Cursor）**：同一个套件也是 agent 的 hook。删档（`rm -rf`）、`git push --force`、部署（`vercel --prod`、`fly deploy`、`wrangler deploy`）、`terraform apply`、发包（`npm publish`）、数据库写入等不可逆的 shell 指令，会先送到 Approvals 工作区等另一个人核准，核准后只放行那一次；其他指令照常执行。先执行一次 `npx -y @hibira-io/mcp-approval-gate login --label "coding agent"`，再装 agent-plugin 里的 `hibira-approval-hooks` 插件（或照上面手动加 hook）。
+- **编码代理审批钩子（Claude Code / Codex / Cursor / Hermes Agent）**：同一个套件也是 agent 的 hook。删档（`rm -rf`）、`git push --force`、部署（`vercel --prod`、`fly deploy`、`wrangler deploy`）、`terraform apply`、发包（`npm publish`）、数据库写入等不可逆的 shell 指令，会先送到 Approvals 工作区等另一个人核准，核准后只放行那一次；其他指令照常执行。先执行一次 `npx -y @hibira-io/mcp-approval-gate login --label "coding agent"`，再装 agent-plugin 里的 `hibira-approval-hooks` 插件（或照上面手动加 hook）。
