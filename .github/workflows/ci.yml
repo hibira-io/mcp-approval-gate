@@ -1,0 +1,46 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ["20", "22", "24"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm ci
+      - run: npm test
+      - name: Package contents
+        run: npm pack --dry-run
+
+  # The gate in front of real database MCP servers and Postgres.
+  real-servers:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: pw
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: astral-sh/setup-uv@v6
+      - run: npm ci
+      - run: node --test test/real-servers.e2e.js
+        env:
+          DATABASE_URL: postgres://postgres:pw@localhost:5432/postgres
+          POSTGRES_MCP_CMD: uvx --overrides test/fixtures/postgres-mcp-overrides.txt --from postgres-mcp==0.3.0 postgres-mcp

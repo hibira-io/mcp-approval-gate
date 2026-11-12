@@ -1,0 +1,66 @@
+{
+  "name": "@hibira-io/mcp-approval-gate",
+  "version": "0.1.0",
+  "mcpName": "io.hibira/mcp-approval-gate",
+  "description": "Supervisor approval for database MCP servers: wrap DBHub, postgres-mcp or Supabase MCP so reads pass through and writes wait for another person to approve them on a hosted page, with push",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "mcp-proxy",
+    "approval",
+    "human-in-the-loop",
+    "supervisor-approval",
+    "sql",
+    "database",
+    "postgres",
+    "mysql",
+    "sqlite",
+    "supabase",
+    "dbhub",
+    "postgres-mcp",
+    "claude",
+    "cursor",
+    "chatgpt",
+    "hibira"
+  ],
+  "homepage": "https://hibira.io",
+  "bugs": {
+    "url": "https://github.com/hibira-io/mcp-approval-gate/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hibira-io/mcp-approval-gate.git"
+  },
+  "license": "MIT",
+  "author": "Hibira (https://hibira.io)",
+  "type": "module",
+  "bin": {
+    "mcp-approval-gate": "bin.js"
+  },
+  "exports": {
+    ".": "./src/gate.js",
+    "./sql": "./src/sql.js",
+    "./policy": "./src/policy.js",
+    "./hibira": "./src/hibira.js"
+  },
+  "files": [
+    "bin.js",
+    "src",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2"
+  },
+  "devDependencies": {
+    "zod": "4.6.7"
+  }
+}
