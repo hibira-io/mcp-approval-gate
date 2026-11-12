@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.0
+
+- No keys to copy: the gate connects to a Hibira Approvals workspace by
+  sign-in. The first change that needs approval answers with a link and a
+  code; a workspace admin connects it, and the gate keeps a workspace token
+  (`~/.config/hibira/approval-gate.json`) that can only ask for and read that
+  workspace's approvals. Requests go to the workspace's members, who decide
+  signed in.
+- `mcp-approval-gate login | status | logout`, `--profile` / `GATE_PROFILE`,
+  and `HIBIRA_APPROVALS_TOKEN` for servers and containers.
+- A Hibira app's `HIBIRA_APP_ID` / `HIBIRA_KEY` / `HIBIRA_SECRET` still work.
+
 ## 0.2.0
 
 - The assistant no longer gets the approval link when the request reaches a

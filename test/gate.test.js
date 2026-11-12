@@ -152,3 +152,34 @@ test('with push or a channel, the assistant never gets the link', async () => {
   const r = await client.callTool({ name: 'execute_sql', arguments: { sql: 'DELETE FROM t WHERE id = 99' } });
   assert.match(text(r), /Approval link: https:/);
 });
+
+test('a gate that is not connected yet answers with the sign-in link and runs nothing', async () => {
+  const login = { url: 'https://hibira.io/device?code=ABCD-1234', code: 'ABCD-1234' };
+  const approvals = { create: async () => { throw Object.assign(new Error('not connected'), { login }); }, get: async () => ({}) };
+  const gate = new Gate({ upstream, approvals, label: 'shop-db', waitSeconds: 1 });
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await gate.createServer().connect(a);
+  const client = new Client({ name: 'c', version: '1' });
+  await client.connect(b);
+  const before = (await ran(client)).length;
+  const r = await client.callTool({ name: 'execute_sql', arguments: { sql: 'DELETE FROM orders WHERE id = 1' } });
+  assert.equal(r.isError, true);
+  assert.match(text(r), /not connected to a Hibira Approvals workspace/);
+  assert.match(text(r), /ABCD-1234/);
+  assert.equal((await ran(client)).length, before);
+  const read = await client.callTool({ name: 'execute_sql', arguments: { sql: 'SELECT 1' } });
+  assert.equal(text(read), 'ran: SELECT 1');
+});
+
+test('with a workspace connection, the assistant never gets the link', async () => {
+  const real = new ApprovalsClient({ appId: 'app_1', key: 'k', secret: 's', baseUrl: hibira.base });
+  const approvals = { notifiesMembers: true, create: (b) => real.create(b), get: (...a) => real.get(...a) };
+  const gate = new Gate({ upstream, approvals, label: 'shop-db', waitSeconds: 1 });
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await gate.createServer().connect(a);
+  const client = new Client({ name: 'c', version: '1' });
+  await client.connect(b);
+  const r = await client.callTool({ name: 'execute_sql', arguments: { sql: 'DELETE FROM orders WHERE id = 7' } });
+  assert.doesNotMatch(text(r), /https?:\/\//);
+  assert.match(text(r), /supervisor has been notified/);
+});

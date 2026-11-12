@@ -55,24 +55,28 @@ front of them.
 
 ## Setup
 
-1. Sign in at [hibira.io](https://hibira.io), create an app (Free works), and
-   copy its **App ID, Key and Secret**.
-2. Turn on Push for the app and subscribe the supervisors' devices to an
-   interest such as `db-approvals`, so requests reach their phones (or pass
-   `--channel` to show them in your own approvals inbox). Without either, the
-   assistant shows the approval link and you forward it to a supervisor.
-3. Put the gate in front of your database MCP server in your client's config
+1. Create a **Hibira Approvals workspace** at [hibira.io](https://hibira.io)
+   and invite the people who approve (store managers, DBAs, ...). They get
+   requests on their phones and decide in the approvals inbox.
+2. Put the gate in front of your database MCP server in your client's config
    (below). Everything after `--` is the database server's usual command.
+   There are no keys to copy.
+3. The first time the assistant tries to change something, it answers with a
+   link and a short code. A workspace admin opens it, picks the workspace and
+   presses **Connect**. From then on the gate is connected; reads work all
+   along.
 
-The Hibira credentials are read from the environment only, and they are not
-passed on to the database server.
+To connect ahead of time from a terminal instead, run
+`npx -y @hibira-io/mcp-approval-gate login`. `status` and `logout` work the
+same way. The connection is a token, kept in
+`~/.config/hibira/approval-gate.json`, that can only ask for and read that
+workspace's approvals. Admins see every connected gate in the workspace
+settings and can revoke one at any time.
 
 ### Claude Code
 
 ```sh
-claude mcp add shop-db \
-  -e HIBIRA_APP_ID=app_... -e HIBIRA_KEY=... -e HIBIRA_SECRET=... \
-  -e GATE_LABEL=shop-production -e GATE_PUSH_INTERESTS=db-approvals \
+claude mcp add shop-db -e GATE_LABEL=shop-production \
   -- npx -y @hibira-io/mcp-approval-gate \
   -- npx -y @bytebase/dbhub --transport stdio --dsn "postgres://user:pass@host:5432/shop"
 ```
@@ -90,16 +94,10 @@ shape:
       "args": [
         "-y", "@hibira-io/mcp-approval-gate",
         "--label", "shop-production",
-        "--push-interests", "db-approvals",
         "--",
         "npx", "-y", "@bytebase/dbhub", "--transport", "stdio",
         "--dsn", "postgres://user:pass@host:5432/shop"
-      ],
-      "env": {
-        "HIBIRA_APP_ID": "app_...",
-        "HIBIRA_KEY": "...",
-        "HIBIRA_SECRET": "..."
-      }
+      ]
     }
   }
 }
@@ -110,7 +108,7 @@ shape:
 ```json
 "args": ["-y", "@hibira-io/mcp-approval-gate", "--label", "analytics", "--",
          "uvx", "postgres-mcp", "--access-mode=unrestricted"],
-"env": { "DATABASE_URI": "postgresql://...", "HIBIRA_APP_ID": "...", "HIBIRA_KEY": "...", "HIBIRA_SECRET": "..." }
+"env": { "DATABASE_URI": "postgresql://..." }
 ```
 
 `--access-mode=unrestricted` is fine here: the gate is what holds writes back.
@@ -120,7 +118,7 @@ shape:
 ```json
 "args": ["-y", "@hibira-io/mcp-approval-gate", "--label", "supabase-prod", "--",
          "npx", "-y", "@supabase/mcp-server-supabase@latest", "--project-ref=<project-ref>"],
-"env": { "SUPABASE_ACCESS_TOKEN": "sbp_...", "HIBIRA_APP_ID": "...", "HIBIRA_KEY": "...", "HIBIRA_SECRET": "..." }
+"env": { "SUPABASE_ACCESS_TOKEN": "sbp_..." }
 ```
 
 `execute_sql` with a `SELECT` runs right away; writes, `apply_migration`,
@@ -141,10 +139,10 @@ database and put HTTPS in front of it (your reverse proxy, a tunnel, or a
 platform such as Fly.io or Railway):
 
 ```sh
-export HIBIRA_APP_ID=app_... HIBIRA_KEY=... HIBIRA_SECRET=...
+npx -y @hibira-io/mcp-approval-gate login      # once, on the server
 export GATE_TOKEN="$(openssl rand -hex 24)"   # keep it secret
 npx -y @hibira-io/mcp-approval-gate --http --host 0.0.0.0 --port 8787 \
-  --label shop-production --push-interests db-approvals \
+  --label shop-production \
   -- npx -y @bytebase/dbhub --transport stdio --dsn "$DATABASE_URL"
 ```
 
@@ -157,7 +155,11 @@ headers may use `https://your-host/mcp` with `Authorization: Bearer <GATE_TOKEN>
   with the token.
 
 The gate refuses to listen on a non-local address without `GATE_TOKEN`.
-A [Dockerfile](Dockerfile) is included.
+A [Dockerfile](Dockerfile) is included. In a container, where there is no
+terminal to sign in from, pass the workspace token as
+`HIBIRA_APPROVALS_TOKEN` (copy it from `~/.config/hibira/approval-gate.json`
+after `login` on any machine), or watch the gate's log for the connect link
+on first start.
 
 ## What the assistant sees
 
@@ -174,9 +176,10 @@ progress updates so the client does not give up early:
   and the call runs if it was approved. Asking for the same call again reuses
   the same request.
 
-**The assistant does not get the approval link** when the request reaches
-the supervisor another way (`--push-interests`, `--push-users` or
-`--channel`), so the person chatting with it cannot approve their own change
+**The assistant does not get the approval link** when the gate is connected
+to an Approvals workspace (its members are notified and decide signed in), or
+when the request reaches the supervisor another way (`--push-interests`,
+`--push-users` or `--channel`), so the person chatting with it cannot approve their own change
 from the chat. Without any of those, the link is the only way to reach a
 supervisor, so the assistant shows it for you to forward. `--show-link always`
 or `never` overrides this.
@@ -208,7 +211,9 @@ user only the rights it needs too.
 
 | Flag | Env | Default | |
 | --- | --- | --- | --- |
-| | `HIBIRA_APP_ID`, `HIBIRA_KEY`, `HIBIRA_SECRET` | required | your Hibira app |
+| | `HIBIRA_APPROVALS_TOKEN` | | a workspace token, instead of signing in (servers, containers) |
+| `--profile` | `GATE_PROFILE` | `default` | which saved connection to use, to connect gates on one machine to different workspaces |
+| | `HIBIRA_APP_ID`, `HIBIRA_KEY`, `HIBIRA_SECRET` | | a Hibira app's keys instead, as in 0.2 (push and channel options apply to these) |
 | | `HIBIRA_API_URL` | `https://ws.hibira.io` | |
 | `--label` | `GATE_LABEL` | `database` | the database's name on the approval page |
 | `--mode` | `GATE_MODE` | `writes` | `writes`, `all` or `none` |
@@ -255,4 +260,4 @@ MIT
 - 看不懂的 SQL、不确定是否只读的工具一律要审批；审批服务连不上就不执行。
 - Gate 跑在你自己的环境，Hibira 只经手审批内容，不碰数据库密码，也看不到查询结果。
 - Claude（Desktop / Code / claude.ai）、Cursor、ChatGPT 都能用；网页端用 `--http` 加 `GATE_TOKEN`。
-- 设定：在 hibira.io 建 app，把 App ID / Key / Secret 放进环境变量，在 `--` 后面接原本的数据库 MCP 指令。
+- 设定：在 hibira.io 建立 Approvals 工作区并邀请审批人；设定里只要在 `--` 后面接原本的数据库 MCP 指令，不用复制任何 Key。第一次要写入时，助手会给一个连接链接和代码，由工作区管理员登入后按「连接」即可（也可先执行 `npx -y @hibira-io/mcp-approval-gate login`）。

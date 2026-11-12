@@ -16,7 +16,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { decide, fingerprint } from './policy.js';
 
-export const VERSION = '0.2.0';
+export const VERSION = '0.3.0';
 const DETAILS_MAX = 4000;
 
 export class Gate {
@@ -165,6 +165,7 @@ export class Gate {
       try {
         created = await this.approvals.create(this.#approvalBody(name, args, d, fp));
       } catch (err) {
+        if (err.login) return connectResult(err.login);
         this.log(`approval request failed: ${err.message}`);
         return errorResult(`Could not ask for approval, so nothing ran: ${err.message}`);
       }
@@ -184,6 +185,8 @@ export class Gate {
   #linkVisible(entry) {
     if (this.showLink === 'always') return true;
     if (this.showLink === 'never') return false;
+    // A workspace notifies its members itself, and they answer signed in.
+    if (this.approvals.notifiesMembers) return false;
     const pushed = (this.pushInterests.length || this.pushUsers.length) && !entry.pushError;
     return !(pushed || this.channel);
   }
@@ -322,6 +325,15 @@ function pendingResult(entry, checkTool) {
   ].join('\n');
   const meta = { approval_id: entry.id, status: 'pending', ...(entry.showLink ? { url: entry.url } : {}) };
   return { content: [{ type: 'text', text }], _meta: { 'io.hibira/approval': meta } };
+}
+
+function connectResult(login) {
+  const text = [
+    'This approval gate is not connected to a Hibira Approvals workspace yet, so nothing ran.',
+    `Ask the person to open ${login.url} and confirm the code ${login.code}, then pick the workspace whose members approve changes.`,
+    'Once they say it is connected, make the same call again.',
+  ].join('\n');
+  return { content: [{ type: 'text', text }], isError: true, _meta: { 'io.hibira/approval': { status: 'not_connected', url: login.url, code: login.code } } };
 }
 
 function errorResult(text) {

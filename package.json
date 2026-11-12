@@ -1,6 +1,6 @@
 {
   "name": "@hibira-io/mcp-approval-gate",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "mcpName": "io.hibira/mcp-approval-gate",
   "description": "Supervisor approval for database MCP servers: wrap DBHub, postgres-mcp or Supabase MCP so reads pass through and writes wait for another person to approve them on a hosted page, with push",
   "keywords": [
