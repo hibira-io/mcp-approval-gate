@@ -1,6 +1,16 @@
 # Changelog
 
-## 0.1.0 (unreleased)
+## 0.2.0
+
+- The assistant no longer gets the approval link when the request reaches a
+  supervisor by push (`--push-interests`, `--push-users`) or a channel
+  (`--channel`), so the person in the chat cannot approve their own change.
+  Without either, the link is still shown so you can forward it.
+  `--show-link auto|always|never` (`GATE_SHOW_LINK`) controls this.
+- New demo and screenshots: the request reaches the store manager's phone and
+  the assistant continues once she approves.
+
+## 0.1.0
 
 - First release: an MCP proxy that puts supervisor approval in front of any
   database MCP server. Reads pass through; writes, schema changes and other

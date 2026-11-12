@@ -16,7 +16,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { decide, fingerprint } from './policy.js';
 
-export const VERSION = '0.1.0';
+export const VERSION = '0.2.0';
 const DETAILS_MAX = 4000;
 
 export class Gate {
@@ -51,6 +51,7 @@ export class Gate {
     this.channel = opts.channel;
     this.options = opts.options;
     this.upstreamTimeoutMs = opts.upstreamTimeoutMs ?? 300_000;
+    this.showLink = opts.showLink ?? 'auto';
     this.log = opts.log ?? (() => {});
     /** fingerprint -> pending call */
     this.pending = new Map();
@@ -99,7 +100,7 @@ export class Gate {
   #instructions() {
     const up = this.upstream.getInstructions?.();
     const own = `Calls that change the ${this.label} (writes, schema changes, deletes) wait for a supervisor's approval before they run. ` +
-      `If a call answers that it is waiting, give the person the approval link, and call ${this.checkTool} with the approval_id when they say it is decided. ` +
+      `If a call answers that it is waiting, tell the person it waits for a supervisor (share the approval link only if the answer includes one), and call ${this.checkTool} with the approval_id when they say it is decided. ` +
       'Do not rewrite a declined statement to get around the decision.';
     return up ? `${up}\n\n${own}` : own;
   }
@@ -168,12 +169,23 @@ export class Gate {
         return errorResult(`Could not ask for approval, so nothing ran: ${err.message}`);
       }
       entry = { id: created.approval_id, url: created.url, name, args, fp, expiresAt: created.expires_at, pushError: created.push_error };
+      entry.showLink = this.#linkVisible(entry);
       this.pending.set(fp, entry);
       this.byId.set(entry.id, fp);
       this.log(`approval ${entry.id} requested for ${name} (${d.reason}): ${entry.url}`);
     }
-    await notify(server, extra, `Waiting for supervisor approval: ${entry.url}`);
+    await notify(server, extra, entry.showLink ? `Waiting for supervisor approval: ${entry.url}` : 'Waiting for supervisor approval');
     return this.#await(entry, this.waitSeconds, extra);
+  }
+
+  // The link goes back to the assistant only when nothing else delivers it:
+  // with push or a channel, the supervisor gets it and the requester never
+  // sees it, so they cannot approve their own change.
+  #linkVisible(entry) {
+    if (this.showLink === 'always') return true;
+    if (this.showLink === 'never') return false;
+    const pushed = (this.pushInterests.length || this.pushUsers.length) && !entry.pushError;
+    return !(pushed || this.channel);
   }
 
   #approvalBody(name, args, d, fp) {
@@ -297,14 +309,19 @@ function otherArgs(args) {
 }
 
 function pendingResult(entry, checkTool) {
-  const text = [
+  const text = entry.showLink ? [
     'Waiting for a supervisor to approve this call. Nothing has run yet.',
     `Approval link: ${entry.url}`,
     `approval_id: ${entry.id}`,
     entry.pushError ? `(The push notification failed: ${entry.pushError}. Share the link instead.)` : '',
-    `Give the person the link. When they say it is decided, call ${checkTool} with this approval_id; it runs the call if it was approved.`,
-  ].filter(Boolean).join('\n');
-  return { content: [{ type: 'text', text }], _meta: { 'io.hibira/approval': { approval_id: entry.id, url: entry.url, status: 'pending' } } };
+    `Give the link to the person who approves. When they have decided, call ${checkTool} with this approval_id; it runs the call if it was approved.`,
+  ].filter(Boolean).join('\n') : [
+    'A supervisor has been notified and must approve this call. Nothing has run yet.',
+    `approval_id: ${entry.id}`,
+    `When the person says it is decided, call ${checkTool} with this approval_id; it runs the call if it was approved.`,
+  ].join('\n');
+  const meta = { approval_id: entry.id, status: 'pending', ...(entry.showLink ? { url: entry.url } : {}) };
+  return { content: [{ type: 'text', text }], _meta: { 'io.hibira/approval': meta } };
 }
 
 function errorResult(text) {

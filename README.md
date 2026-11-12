@@ -8,7 +8,7 @@ as approved.
 
 ![An assistant asks to update an order; the change waits until a supervisor approves it on their phone, then runs once](https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/demo.gif)
 
-<sub>A real session: Claude Code asks to mark order 1042 as refunded through DBHub. The `UPDATE` waits, the supervisor approves it on the Hibira page, and the assistant finishes the change. ([MP4](https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/demo.mp4))</sub>
+<sub>A real session: Claude Code asks to mark order 1042 as refunded through DBHub. The `UPDATE` waits and the assistant never gets the approval link. The store manager's phone gets the request, she approves it, and the assistant finishes the change. ([MP4](https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/demo.mp4))</sub>
 
 It works with any MCP server, and is tested with:
 
@@ -48,17 +48,19 @@ front of them.
   changes every row", and the full statement.
 
 <p>
-  <img src="https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/approval-page.png" width="260" alt="The approval page on a phone: UPDATE on shop-production, with the statement, fingerprint and Approve / Reject buttons">
-  <img src="https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/approval-approved.png" width="260" alt="The same request after the supervisor approved it">
+  <img src="https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/supervisor-notification.png" width="240" alt="The supervisor's phone gets the request: UPDATE on shop-production">
+  <img src="https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/approval-page.png" width="240" alt="The approval page: database, kind of change, the full statement and its fingerprint">
+  <img src="https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/approval-approved.png" width="240" alt="The same request after the supervisor approved it">
 </p>
 
 ## Setup
 
 1. Sign in at [hibira.io](https://hibira.io), create an app (Free works), and
    copy its **App ID, Key and Secret**.
-2. Optional: turn on Push for the app and subscribe the supervisors' devices to
-   an interest such as `db-approvals`, so requests reach their phones. Without
-   push, the assistant shows the approval link and you share it.
+2. Turn on Push for the app and subscribe the supervisors' devices to an
+   interest such as `db-approvals`, so requests reach their phones (or pass
+   `--channel` to show them in your own approvals inbox). Without either, the
+   assistant shows the approval link and you forward it to a supervisor.
 3. Put the gate in front of your database MCP server in your client's config
    (below). Everything after `--` is the database server's usual command.
 
@@ -166,10 +168,18 @@ progress updates so the client does not give up early:
   saying it was approved.
 - **Rejected or expired:** an error saying it did not run, with the
   supervisor's comment if they left one.
-- **Still waiting:** a short answer with the approval link and `approval_id`.
-  The gate adds one tool, `check_approval`: when the person says it is
-  decided, the assistant calls it with that `approval_id`, and the call runs if
-  it was approved. Asking for the same call again reuses the same request.
+- **Still waiting:** a short answer saying a supervisor has to approve it,
+  with an `approval_id`. The gate adds one tool, `check_approval`: when the
+  person says it is decided, the assistant calls it with that `approval_id`,
+  and the call runs if it was approved. Asking for the same call again reuses
+  the same request.
+
+**The assistant does not get the approval link** when the request reaches
+the supervisor another way (`--push-interests`, `--push-users` or
+`--channel`), so the person chatting with it cannot approve their own change
+from the chat. Without any of those, the link is the only way to reach a
+supervisor, so the assistant shows it for you to forward. `--show-link always`
+or `never` overrides this.
 
 ## What waits for approval
 
@@ -207,6 +217,7 @@ user only the rights it needs too.
 | `--push-interests` | `GATE_PUSH_INTERESTS` | | push the request to these interests |
 | `--push-users` | `GATE_PUSH_USERS` | | ...or to these user ids |
 | `--channel` | `GATE_CHANNEL` | | also announce requests on this channel, e.g. for an [approvals inbox](https://github.com/hibira-io/approvals) |
+| `--show-link` | `GATE_SHOW_LINK` | `auto` | give the assistant the approval link: `auto` (only without push or a channel), `always`, `never` |
 | `--options` | `GATE_OPTIONS` | `Approve,Reject` | answer buttons; the first one approves |
 | `--wait` | `GATE_WAIT_SECONDS` | `50` | how long a call waits before answering "still waiting" |
 | `--expires` | `GATE_EXPIRES_MINUTES` | `60` | how long a request stays open (up to 7 days) |
@@ -240,6 +251,7 @@ MIT
 `@hibira-io/mcp-approval-gate` 套在任何数据库 MCP server（DBHub、postgres-mcp、Supabase MCP 等）外面：**读取直接通过；写入、改表、删除会先停下，等另一个人（主管）在 Hibira 托管的审批页或手机推播上核准**，核准后只按原样执行一次。
 
 - 审批绑定这一次调用的完整参数（附指纹），SQL 改了就要重新审批。
+- 设定了推播或频道时，助手拿不到审批链接，只有收到推播的主管能核准。
 - 看不懂的 SQL、不确定是否只读的工具一律要审批；审批服务连不上就不执行。
 - Gate 跑在你自己的环境，Hibira 只经手审批内容，不碰数据库密码，也看不到查询结果。
 - Claude（Desktop / Code / claude.ai）、Cursor、ChatGPT 都能用；网页端用 `--http` 加 `GATE_TOKEN`。

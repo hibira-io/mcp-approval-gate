@@ -49,6 +49,8 @@ test('splitCommand and parse', async () => {
   assert.deepEqual(parse(['--label', 'x', '--', 'a', '--b'], {}).command, ['a', '--b']);
   assert.throws(() => parse([], {}), /wrap/);
   assert.throws(() => parse(['--mode', 'some', '--', 'a'], {}), /mode/);
+  assert.throws(() => parse(['--show-link', 'x', '--', 'a'], {}), /show-link/);
+  assert.equal(parse(['--', 'a'], {}).showLink, 'auto');
   assert.deepEqual(parse(['--', 'a'], { GATE_UPSTREAM_HEADERS: 'Authorization: Bearer x' }).headers, { Authorization: 'Bearer x' });
   assert.deepEqual(parse(['--header', 'Authorization: Bearer ${TOK}', '--upstream-url', 'https://x/mcp'], { TOK: 'abc' }).headers, { Authorization: 'Bearer abc' });
   const env = childEnv({ HIBIRA_SECRET: 's', HIBIRA_KEY: 'k', GATE_TOKEN: 't', DATABASE_URI: 'd' });

@@ -34,6 +34,8 @@ Options (each also as an env var, shown in brackets):
   --push-users <list>       ...or to these user ids [GATE_PUSH_USERS]
   --channel <name>          also announce requests on this channel (approvals inbox) [GATE_CHANNEL]
   --options <a,b>           answer buttons, first one approves (default Approve,Reject) [GATE_OPTIONS]
+  --show-link <auto|always|never>  give the assistant the approval link; auto (default) only when
+                            no push or channel delivers it to the supervisor [GATE_SHOW_LINK]
   --wait <seconds>          how long a call waits before answering "pending" (default 50) [GATE_WAIT_SECONDS]
   --expires <minutes>       how long a request stays open (default 60) [GATE_EXPIRES_MINUTES]
   --upstream-url <url>      remote MCP server to wrap [GATE_UPSTREAM_URL]
@@ -89,7 +91,7 @@ export function parse(argv, env) {
     options: {
       label: { type: 'string' }, mode: { type: 'string' }, allow: { type: 'string' }, gate: { type: 'string' },
       'push-interests': { type: 'string' }, 'push-users': { type: 'string' }, channel: { type: 'string' },
-      options: { type: 'string' }, wait: { type: 'string' }, expires: { type: 'string' },
+      options: { type: 'string' }, wait: { type: 'string' }, expires: { type: 'string' }, 'show-link': { type: 'string' },
       'upstream-url': { type: 'string' }, header: { type: 'string', multiple: true },
       http: { type: 'boolean' }, port: { type: 'string' }, host: { type: 'string' },
       version: { type: 'boolean' }, help: { type: 'boolean', short: 'h' },
@@ -127,11 +129,13 @@ export function parse(argv, env) {
     options: list(values.options ?? env.GATE_OPTIONS),
     waitSeconds: num(values.wait ?? env.GATE_WAIT_SECONDS, 50, '--wait', 0, 3600),
     expiresMinutes: num(values.expires ?? env.GATE_EXPIRES_MINUTES, 60, '--expires', 1, 10080),
+    showLink: values['show-link'] ?? env.GATE_SHOW_LINK ?? 'auto',
     http: values.http ?? false,
     port: num(values.port ?? env.PORT, 8787, '--port', 1, 65535),
     host: values.host ?? env.GATE_HOST ?? '127.0.0.1',
     token: env.GATE_TOKEN,
   };
+  if (!['auto', 'always', 'never'].includes(opts.showLink)) throw new Error('--show-link must be auto, always or never');
   if (opts.pushInterests.length && opts.pushUsers.length) throw new Error('give --push-interests or --push-users, not both');
   if (!opts.help && !opts.version && !opts.command.length && !opts.upstreamUrl) {
     throw new Error('give the database MCP server to wrap after -- (or in GATE_COMMAND), or --upstream-url');
