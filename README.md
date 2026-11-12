@@ -219,6 +219,7 @@ user only the rights it needs too.
 | `--mode` | `GATE_MODE` | `writes` | `writes`, `all` or `none` |
 | `--allow` | `GATE_ALLOW_TOOLS` | | tools that never wait |
 | `--gate` | `GATE_TOOLS` | | tools that always wait |
+| `--approvers` | `GATE_APPROVERS` | | who may decide, in an Approvals workspace: approver group slugs or members' emails (default: any admin or approver) |
 | `--push-interests` | `GATE_PUSH_INTERESTS` | | push the request to these interests |
 | `--push-users` | `GATE_PUSH_USERS` | | ...or to these user ids |
 | `--channel` | `GATE_CHANNEL` | | also announce requests on this channel, e.g. for an [approvals inbox](https://github.com/hibira-io/approvals) |

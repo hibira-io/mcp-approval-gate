@@ -8,6 +8,8 @@
   (`~/.config/hibira/approval-gate.json`) that can only ask for and read that
   workspace's approvals. Requests go to the workspace's members, who decide
   signed in.
+- `--approvers` / `GATE_APPROVERS`: limit who may decide to approver groups
+  or members, and the answer names who approved ("Approved by Mei Lin").
 - `mcp-approval-gate login | status | logout`, `--profile` / `GATE_PROFILE`,
   and `HIBIRA_APPROVALS_TOKEN` for servers and containers.
 - A Hibira app's `HIBIRA_APP_ID` / `HIBIRA_KEY` / `HIBIRA_SECRET` still work.

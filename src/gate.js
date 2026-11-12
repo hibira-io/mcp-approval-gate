@@ -46,6 +46,7 @@ export class Gate {
     this.gateTools = opts.gateTools ?? [];
     this.waitSeconds = opts.waitSeconds ?? 50;
     this.expiresMinutes = opts.expiresMinutes ?? 60;
+    this.approvers = opts.approvers ?? [];
     this.pushInterests = opts.pushInterests ?? [];
     this.pushUsers = opts.pushUsers ?? [];
     this.channel = opts.channel;
@@ -214,6 +215,7 @@ export class Gate {
       agent: truncate(`Approval gate · ${this.label}`, 60),
     };
     if (this.options?.length) out.options = this.options;
+    if (this.approvers.length) out.approvers = this.approvers;
     if (this.channel) out.channel = this.channel;
     if (this.pushInterests.length) out.push_interests = this.pushInterests;
     else if (this.pushUsers.length) out.push_users = this.pushUsers;
@@ -243,7 +245,7 @@ export class Gate {
       if (state.status === 'approved') return this.#run(entry, state, extra);
       if (state.status === 'rejected' || state.status === 'expired') {
         this.#forget(entry);
-        const how = state.status === 'expired' ? 'Nobody answered in time' : `The supervisor chose "${state.choice}"`;
+        const how = state.status === 'expired' ? 'Nobody answered in time' : `${state.answered_by?.name || state.answered_by?.email || 'The supervisor'} chose "${state.choice}"`;
         return errorResult(`${how}, so the call did not run.${state.comment ? ` Comment: ${state.comment}` : ''} Do not retry it unless the person asks.`);
       }
       if (Date.now() >= deadline) return pendingResult(entry, this.checkTool);
@@ -272,7 +274,8 @@ export class Gate {
     this.#forget(entry);
     this.log(`approval ${entry.id} approved (${state.choice}); running ${entry.name}`);
     const result = await this.#forward(entry.name, entry.args, extra);
-    const note = { type: 'text', text: `Approved by a supervisor (${state.choice}${state.comment ? `: ${state.comment}` : ''}); ran once.` };
+    const who = state.answered_by?.name || state.answered_by?.email || 'a supervisor';
+    const note = { type: 'text', text: `Approved by ${who} (${state.choice}${state.comment ? `: ${state.comment}` : ''}); ran once.` };
     return { ...result, content: [...(result.content ?? []), note] };
   }
 

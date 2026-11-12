@@ -183,3 +183,15 @@ test('with a workspace connection, the assistant never gets the link', async () 
   assert.doesNotMatch(text(r), /https?:\/\//);
   assert.match(text(r), /supervisor has been notified/);
 });
+
+test('--approvers is sent, and the answer names who approved', async () => {
+  const { client } = await connect({ approvers: ['dba', 'mei@example.tw'] });
+  const sql = "UPDATE orders SET status = 'refunded' WHERE id = 2001";
+  const call = client.callTool({ name: 'execute_sql', arguments: { sql } });
+  await new Promise((r) => setTimeout(r, 150));
+  const req = hibira.created.at(-1);
+  assert.deepEqual(req.body.approvers, ['dba', 'mei@example.tw']);
+  hibira.decide(req.id, 'Approve', undefined, { email: 'mei@example.tw', name: 'Mei Lin' });
+  const r = await call;
+  assert.match(text(r), /Approved by Mei Lin \(Approve\); ran once/);
+});

@@ -44,8 +44,9 @@ export async function fakeHibira({ appId = 'app_1', key = 'k', secret = 's' } = 
   const base = `http://127.0.0.1:${server.address().port}`;
   return {
     base, created,
-    decide(id, choice, comment) {
+    decide(id, choice, comment, answeredBy) {
       const a = approvals.get(id);
+      if (answeredBy) a.answered_by = answeredBy;
       a.choice = choice;
       a.status = choice === a.options[0] ? 'approved' : 'rejected';
       if (comment) a.comment = comment;
