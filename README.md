@@ -8,7 +8,7 @@ as approved.
 
 ![An assistant asks to update an order; the change waits until a supervisor approves it on their phone, then runs once](https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/demo.gif)
 
-<sub>A real session: Claude Code asks to mark order 1042 as refunded through DBHub. The `UPDATE` waits and the assistant never gets the approval link. The store manager's phone gets the request, she approves it, and the assistant finishes the change. ([MP4](https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/demo.mp4))</sub>
+<sub>A real session: Claude Code asks to mark order 1042 as refunded through DBHub. The `UPDATE` waits and the assistant never gets the approval link. The store manager's phone shows a notification from the Hibira Approvals inbox; she taps it, checks the statement and approves, and the assistant finishes the change. ([MP4](https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/demo.mp4) · [the same request rejected](https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/demo-reject.mp4))</sub>
 
 It works with any MCP server, and is tested with:
 
@@ -48,14 +48,14 @@ front of them.
   changes every row", and the full statement.
 
 <p>
-  <img src="https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/supervisor-notification.png" width="240" alt="The supervisor's phone gets the request: UPDATE on shop-production">
-  <img src="https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/approval-page.png" width="240" alt="The approval page: database, kind of change, the full statement and its fingerprint">
-  <img src="https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/approval-approved.png" width="240" alt="The same request after the supervisor approved it">
+  <img src="https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/supervisor-notification.png" width="240" alt="A notification on the supervisor's phone: UPDATE on shop-production is waiting for a decision">
+  <img src="https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/approval-page.png" width="240" alt="The request in the approvals inbox: database, kind of change, the full statement and its fingerprint, with Approve and Reject">
+  <img src="https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/approval-approved.png" width="240" alt="The same request after the supervisor approved it, with who answered and when">
 </p>
 
 ## Setup
 
-1. Create a **Hibira Approvals workspace** at [hibira.io](https://hibira.io)
+1. Create a **Hibira Approvals workspace** at [approvals.hibira.io](https://approvals.hibira.io)
    and invite the people who approve (store managers, DBAs, ...). They get
    requests on their phones and decide in the approvals inbox.
 2. Put the gate in front of your database MCP server in your client's config
