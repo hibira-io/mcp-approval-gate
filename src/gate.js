@@ -170,7 +170,7 @@ export class Gate {
       entry = { id: created.approval_id, url: created.url, name, args, fp, expiresAt: created.expires_at, pushError: created.push_error };
       this.pending.set(fp, entry);
       this.byId.set(entry.id, fp);
-      this.log(`approval ${entry.id} requested for ${name} (${d.reason})`);
+      this.log(`approval ${entry.id} requested for ${name} (${d.reason}): ${entry.url}`);
     }
     await notify(server, extra, `Waiting for supervisor approval: ${entry.url}`);
     return this.#await(entry, this.waitSeconds, extra);

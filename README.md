@@ -6,6 +6,10 @@ data or schema waits until **another person approves it** on a hosted approval
 page, sent to their phone as a push notification. Then it runs once, exactly
 as approved.
 
+![An assistant asks to update an order; the change waits until a supervisor approves it on their phone, then runs once](https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/demo.gif)
+
+<sub>A real session: Claude Code asks to mark order 1042 as refunded through DBHub. The `UPDATE` waits, the supervisor approves it on the Hibira page, and the assistant finishes the change. ([MP4](https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/demo.mp4))</sub>
+
 It works with any MCP server, and is tested with:
 
 - [DBHub](https://github.com/bytebase/dbhub) (Postgres, MySQL, MariaDB, SQL Server, SQLite)
@@ -42,6 +46,11 @@ front of them.
 - **Clear for the reviewer.** The page shows the database label, the kind of
   change (`UPDATE`, `DROP TABLE`, ...), warnings such as "DELETE without WHERE
   changes every row", and the full statement.
+
+<p>
+  <img src="https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/approval-page.png" width="260" alt="The approval page on a phone: UPDATE on shop-production, with the statement, fingerprint and Approve / Reject buttons">
+  <img src="https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/approval-approved.png" width="260" alt="The same request after the supervisor approved it">
+</p>
 
 ## Setup
 
