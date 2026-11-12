@@ -199,7 +199,7 @@ export class Gate {
     const custom = !sql && this.preset?.title ? this.preset.title(name, args) : undefined;
     const title = truncate(custom || `${what} on ${this.label}`, 200);
     const lines = [];
-    lines.push(`${this.preset && !sql ? 'Service' : 'Database'}: ${this.label}`);
+    lines.push(`${sql ? 'Database' : 'Service'}: ${this.label}`);
     lines.push(`Tool: ${name}`);
     if (sql?.kinds?.length) lines.push(`Changes: ${sql.kinds.join(', ')}`);
     for (const w of sql?.warnings ?? []) lines.push(`⚠ ${w}`);
