@@ -24,8 +24,13 @@ export function sqlArguments(args) {
   return out;
 }
 
-function matches(list, name) {
-  return list.some((p) => (p.endsWith('*') ? name.startsWith(p.slice(0, -1)) : p === name));
+// A pattern is a tool name, a prefix ending in * or a suffix starting with *.
+export function matches(list, name) {
+  return list.some((p) => {
+    if (p.endsWith('*')) return name.startsWith(p.slice(0, -1));
+    if (p.startsWith('*')) return name.endsWith(p.slice(1));
+    return p === name;
+  });
 }
 
 /**
@@ -33,9 +38,13 @@ function matches(list, name) {
  * annotations), or undefined if unknown. Returns { gate, reason, sql }
  * where sql is the classification when the call carries SQL.
  */
-export function decide({ name, args, tool, mode = 'writes', allowTools = [], gateTools = [] }) {
+export function decide({ name, args, tool, mode = 'writes', allowTools = [], gateTools = [], preset }) {
   if (matches(gateTools, name)) return { gate: true, reason: 'tool is always gated' };
   if (matches(allowTools, name)) return { gate: false, reason: 'tool is always allowed' };
+  if (preset && mode === 'writes') {
+    if (matches(preset.gate ?? [], name)) return { gate: true, reason: `${preset.label} tool that changes something` };
+    if (matches(preset.allow ?? [], name)) return { gate: false, reason: `${preset.label} tool that only reads` };
+  }
   const sqls = sqlArguments(args);
   const sql = sqls.length ? classifySql(sqls.join(';\n')) : undefined;
   if (mode === 'all') return { gate: true, reason: 'every call is gated', sql };

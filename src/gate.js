@@ -40,12 +40,14 @@ export class Gate {
   constructor(opts) {
     this.upstream = opts.upstream;
     this.approvals = opts.approvals;
-    this.label = opts.label || 'database';
+    this.preset = opts.preset;
+    this.label = opts.label || opts.preset?.label || 'database';
     this.mode = opts.mode ?? 'writes';
     this.allowTools = opts.allowTools ?? [];
     this.gateTools = opts.gateTools ?? [];
     this.waitSeconds = opts.waitSeconds ?? 50;
     this.expiresMinutes = opts.expiresMinutes ?? 60;
+    this.approvers = opts.approvers ?? [];
     this.pushInterests = opts.pushInterests ?? [];
     this.pushUsers = opts.pushUsers ?? [];
     this.channel = opts.channel;
@@ -122,7 +124,7 @@ export class Gate {
   }
 
   #describe(tool) {
-    const d = decide({ name: tool.name, args: {}, tool, mode: this.mode, allowTools: this.allowTools, gateTools: this.gateTools });
+    const d = decide({ name: tool.name, args: {}, tool, mode: this.mode, allowTools: this.allowTools, gateTools: this.gateTools, preset: this.preset });
     const sqlTool = Object.keys(tool.inputSchema?.properties ?? {}).some((k) => ['sql', 'query', 'statement', 'statements', 'sql_query', 'queries', 'script'].includes(k.toLowerCase()));
     let note;
     if (sqlTool && this.mode === 'writes') note = 'Read-only SQL runs right away; statements that change data or schema wait for a supervisor\'s approval.';
@@ -155,7 +157,7 @@ export class Gate {
     const { name, arguments: args = {} } = params;
     if (name === this.checkTool) return this.#check(String(args.approval_id ?? ''), extra);
     const tool = await this.#toolDef(name);
-    const d = decide({ name, args, tool, mode: this.mode, allowTools: this.allowTools, gateTools: this.gateTools });
+    const d = decide({ name, args, tool, mode: this.mode, allowTools: this.allowTools, gateTools: this.gateTools, preset: this.preset });
     if (!d.gate) return this.#forward(name, args, extra);
 
     const fp = fingerprint(name, args);
@@ -194,9 +196,10 @@ export class Gate {
   #approvalBody(name, args, d, fp) {
     const sql = d.sql;
     const what = sql?.kinds?.length ? sql.kinds.join(', ') : name;
-    const title = truncate(`${what} on ${this.label}`, 200);
+    const custom = !sql && this.preset?.title ? this.preset.title(name, args) : undefined;
+    const title = truncate(custom || `${what} on ${this.label}`, 200);
     const lines = [];
-    lines.push(`Database: ${this.label}`);
+    lines.push(`${this.preset && !sql ? 'Service' : 'Database'}: ${this.label}`);
     lines.push(`Tool: ${name}`);
     if (sql?.kinds?.length) lines.push(`Changes: ${sql.kinds.join(', ')}`);
     for (const w of sql?.warnings ?? []) lines.push(`⚠ ${w}`);
@@ -214,6 +217,7 @@ export class Gate {
       agent: truncate(`Approval gate · ${this.label}`, 60),
     };
     if (this.options?.length) out.options = this.options;
+    if (this.approvers.length) out.approvers = this.approvers;
     if (this.channel) out.channel = this.channel;
     if (this.pushInterests.length) out.push_interests = this.pushInterests;
     else if (this.pushUsers.length) out.push_users = this.pushUsers;
@@ -243,7 +247,7 @@ export class Gate {
       if (state.status === 'approved') return this.#run(entry, state, extra);
       if (state.status === 'rejected' || state.status === 'expired') {
         this.#forget(entry);
-        const how = state.status === 'expired' ? 'Nobody answered in time' : `The supervisor chose "${state.choice}"`;
+        const how = state.status === 'expired' ? 'Nobody answered in time' : `${state.answered_by?.name || state.answered_by?.email || 'The supervisor'} chose "${state.choice}"`;
         return errorResult(`${how}, so the call did not run.${state.comment ? ` Comment: ${state.comment}` : ''} Do not retry it unless the person asks.`);
       }
       if (Date.now() >= deadline) return pendingResult(entry, this.checkTool);
@@ -272,7 +276,8 @@ export class Gate {
     this.#forget(entry);
     this.log(`approval ${entry.id} approved (${state.choice}); running ${entry.name}`);
     const result = await this.#forward(entry.name, entry.args, extra);
-    const note = { type: 'text', text: `Approved by a supervisor (${state.choice}${state.comment ? `: ${state.comment}` : ''}); ran once.` };
+    const who = state.answered_by?.name || state.answered_by?.email || 'a supervisor';
+    const note = { type: 'text', text: `Approved by ${who} (${state.choice}${state.comment ? `: ${state.comment}` : ''}); ran once.` };
     return { ...result, content: [...(result.content ?? []), note] };
   }
 
