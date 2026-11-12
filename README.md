@@ -8,7 +8,7 @@ as approved.
 
 ![An assistant asks to update an order; the change waits until a supervisor approves it on their phone, then runs once](https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/demo.gif)
 
-<sub>A real session: Claude Code asks to mark order 1042 as refunded through DBHub. The `UPDATE` waits and the assistant never gets the approval link. The store manager's phone shows a notification from the Hibira Approvals inbox; she taps it, checks the statement and approves, and the assistant finishes the change. ([MP4](https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/demo.mp4) · [the same request rejected](https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/demo-reject.mp4))</sub>
+<sub>A real session: Claude Code asks to mark order 1042 as refunded through DBHub. The `UPDATE` waits and the assistant never gets the approval link. The request shows up in the store manager's Hibira Approvals inbox on her phone (it is also sent to her as a push notification); she opens it, checks the statement and approves, and the assistant finishes the change. ([MP4](https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/demo.mp4) · [the same request rejected](https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/demo-reject.mp4))</sub>
 
 It works with any MCP server, and is tested with:
 
@@ -48,7 +48,7 @@ front of them.
   changes every row", and the full statement.
 
 <p>
-  <img src="https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/supervisor-notification.png" width="240" alt="A notification on the supervisor's phone: UPDATE on shop-production is waiting for a decision">
+  <img src="https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/supervisor-notification.png" width="240" alt="The supervisor's approvals inbox on her phone: UPDATE on shop-production is waiting for her">
   <img src="https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/approval-page.png" width="240" alt="The request in the approvals inbox: database, kind of change, the full statement and its fingerprint, with Approve and Reject">
   <img src="https://raw.githubusercontent.com/hibira-io/mcp-approval-gate/main/docs/approval-approved.png" width="240" alt="The same request after the supervisor approved it, with who answered and when">
 </p>
