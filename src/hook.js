@@ -6,7 +6,7 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { homedir, hostname, userInfo } from 'node:os';
+import { homedir, hostname } from 'node:os';
 import { dirname, join } from 'node:path';
 import { classifyShell } from './shell.js';
 import { ApprovalsClient } from './hibira.js';
@@ -100,7 +100,6 @@ export function readInput(input, client) {
     agent,
     command: shellTool && typeof command === 'string' ? command : undefined,
     cwd: input.cwd || process.cwd(),
-    session: input.session_id,
   };
 }
 
@@ -173,7 +172,7 @@ function shorten(s, n) {
 }
 
 /** The request a person sees in the Approvals inbox. */
-export function requestBody({ agent, command, cwd, session, verdict, settings, git = gitInfo(cwd) }) {
+export function requestBody({ agent, command, cwd, verdict, settings, git = gitInfo(cwd) }) {
   const name = AGENTS[agent] ?? agent;
   const lines = [`${name} wants to run:`, '', command.length > 4000 ? `${command.slice(0, 4000)}\n…` : command, ''];
   const why = [...new Set(verdict.reasons.map((r) => (r.remote ? `${r.label} (on a remote machine)` : r.label)))];
@@ -181,10 +180,7 @@ export function requestBody({ agent, command, cwd, session, verdict, settings, g
   for (const w of verdict.warnings) lines.push(`⚠ ${w}`);
   lines.push(`Folder: ${cwd}`);
   if (git.remote) lines.push(`Repository: ${git.remote}${git.branch ? ` (${git.branch})` : ''}`);
-  let user = '';
-  try { user = userInfo().username; } catch { /* no user */ }
-  lines.push(`Computer: ${user ? `${user}@` : ''}${hostname()}`);
-  if (session) lines.push(`Session: ${String(session).slice(0, 12)}`);
+  lines.push(`Computer: ${hostname()}`);
   const body = {
     title: shorten(`${name}: ${command}`, 200),
     details: lines.join('\n'),
@@ -208,7 +204,7 @@ function answeredBy(res) {
  * Decides one hook call. Returns { kind, reason, userMessage }.
  * deps: { approvals, state, settings, now, sleep } for tests.
  */
-export async function decideHook({ agent, command, cwd, session }, deps) {
+export async function decideHook({ agent, command, cwd }, deps) {
   const { settings } = deps;
   if (!command || !settings.enabled) return { kind: 'pass' };
   const verdict = classifyShell(command, settings);
@@ -235,7 +231,7 @@ export async function decideHook({ agent, command, cwd, session }, deps) {
   let created;
   if (!entry) {
     try {
-      created = await approvals.create(requestBody({ agent, command, cwd, session, verdict, settings, git: deps.git }));
+      created = await approvals.create(requestBody({ agent, command, cwd, verdict, settings, git: deps.git }));
     } catch (err) {
       if (err.status === 401) {
         return { kind: 'deny', reason: `Hibira Approvals refused this computer's sign-in (it may have been disconnected). Ask the user to run \`${LOGIN}\` again, then retry the same command.` };
