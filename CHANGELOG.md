@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.0
+
+- `mcp-approval-gate hook claude|codex|cursor`: a hook for coding agents.
+  Shell commands that delete files, rewrite git history, deploy, change
+  infrastructure, publish packages or write to a database wait for a second
+  person in the Hibira Approvals workspace; everything else runs as usual.
+  Uses the same sign-in as the gate. `hook check -- <command>` shows whether
+  a command would wait.
+- Settings in `~/.config/hibira/approval-hook.json` (`always`, `never`,
+  `approvers`, `wait`, `expires`), `GATE_HOOK_*` and `GATE_APPROVERS`; a
+  project can add `always` rules and approvers in `.hibira/approval-hook.json`.
+
 ## 0.3.0
 
 - No keys to copy: the gate connects to a Hibira Approvals workspace by

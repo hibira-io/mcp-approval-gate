@@ -3,7 +3,7 @@
   "name": "io.hibira/mcp-approval-gate",
   "title": "Approval gate for databases",
   "description": "Wraps a database MCP server: reads pass, writes wait for a supervisor to approve them.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "websiteUrl": "https://github.com/hibira-io/mcp-approval-gate",
   "repository": { "url": "https://github.com/hibira-io/mcp-approval-gate", "source": "github" },
   "icons": [
@@ -13,7 +13,7 @@
     {
       "registryType": "npm",
       "identifier": "@hibira-io/mcp-approval-gate",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "transport": { "type": "stdio" },
       "environmentVariables": [
         { "name": "GATE_COMMAND", "description": "The database MCP server to wrap, e.g. npx -y @bytebase/dbhub --transport stdio --dsn postgres://user:pass@host/db", "isRequired": true, "isSecret": true },

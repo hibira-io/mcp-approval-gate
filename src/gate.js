@@ -16,7 +16,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { decide, fingerprint } from './policy.js';
 
-export const VERSION = '0.3.0';
+export const VERSION = '0.4.0';
 const DETAILS_MAX = 4000;
 
 export class Gate {
