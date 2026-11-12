@@ -43,3 +43,4 @@ jobs:
       - run: node --test test/real-servers.e2e.js
         env:
           DATABASE_URL: postgres://postgres:pw@localhost:5432/postgres
+          POSTGRES_MCP_CMD: uvx --overrides test/fixtures/postgres-mcp-overrides.txt --from postgres-mcp==0.3.0 postgres-mcp
