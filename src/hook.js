@@ -35,6 +35,7 @@ Settings (env, or ~/.config/hibira/approval-hook.json with the keys in brackets)
   GATE_HOOK_WAIT                 seconds to wait for an answer, default 600 [wait]
   GATE_EXPIRES_MINUTES           how long a request stays open, default 30 [expires]
   GATE_PROFILE                   which connected workspace to use, default "default" [profile]
+  GATE_LOGIN_COMMAND             the connect command the agent tells the user to run (containers)
 A project can add rules (never remove them) in .hibira/approval-hook.json: { "always": [...], "approvers": [...] }.
 `;
 
@@ -68,6 +69,7 @@ export function loadSettings(env = process.env, cwd = process.cwd()) {
     pushInterests: (env.GATE_PUSH_INTERESTS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
     pushUsers: (env.GATE_PUSH_USERS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
     channel: env.GATE_CHANNEL || undefined,
+    login: env.GATE_LOGIN_COMMAND || LOGIN,
   };
 }
 
@@ -211,6 +213,7 @@ function answeredBy(res) {
 export async function decideHook({ agent, command, cwd }, deps) {
   const { settings } = deps;
   if (!command || !settings.enabled) return { kind: 'pass' };
+  const login = settings.login ?? LOGIN;
   const verdict = classifyShell(command, settings);
   if (!verdict.gate) return { kind: 'pass' };
   const what = shorten(verdict.reasons.map((r) => r.label).join('; '), 160);
@@ -219,9 +222,9 @@ export async function decideHook({ agent, command, cwd }, deps) {
     return {
       kind: 'deny',
       reason: `This command needs a second person's approval (${what}), but this computer is not connected to a Hibira Approvals workspace yet. ` +
-        `Ask the user to run \`${LOGIN}\` in a terminal, or run it yourself in the background and show the user the link and code it prints. ` +
+        `Ask the user to run \`${login}\` in a terminal, or run it yourself in the background and show the user the link and code it prints. ` +
         'Once it says connected, run the same command again. Do not try another way to do the same thing.',
-      userMessage: `Hibira Approvals: "${shorten(command, 80)}" needs approval. Connect this computer first: ${LOGIN}`,
+      userMessage: `Hibira Approvals: "${shorten(command, 80)}" needs approval. Connect this computer first: ${login}`,
     };
   }
   const fp = createHash('sha256').update(JSON.stringify([cwd, command])).digest('hex');
@@ -238,7 +241,7 @@ export async function decideHook({ agent, command, cwd }, deps) {
       created = await approvals.create(requestBody({ agent, command, cwd, verdict, settings, git: deps.git }));
     } catch (err) {
       if (err.status === 401) {
-        return { kind: 'deny', reason: `Hibira Approvals refused this computer's sign-in (it may have been disconnected). Ask the user to run \`${LOGIN}\` again, then retry the same command.` };
+        return { kind: 'deny', reason: `Hibira Approvals refused this computer's sign-in (it may have been disconnected). Ask the user to run \`${login}\` again, then retry the same command.` };
       }
       if (err.status === 402) {
         return {
