@@ -152,3 +152,55 @@ test('with push or a channel, the assistant never gets the link', async () => {
   const r = await client.callTool({ name: 'execute_sql', arguments: { sql: 'DELETE FROM t WHERE id = 99' } });
   assert.match(text(r), /Approval link: https:/);
 });
+
+test('a gate that is not connected yet answers with the sign-in link and runs nothing', async () => {
+  const login = { url: 'https://hibira.io/device?code=ABCD-1234', code: 'ABCD-1234' };
+  const approvals = { create: async () => { throw Object.assign(new Error('not connected'), { login }); }, get: async () => ({}) };
+  const gate = new Gate({ upstream, approvals, label: 'shop-db', waitSeconds: 1 });
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await gate.createServer().connect(a);
+  const client = new Client({ name: 'c', version: '1' });
+  await client.connect(b);
+  const before = (await ran(client)).length;
+  const r = await client.callTool({ name: 'execute_sql', arguments: { sql: 'DELETE FROM orders WHERE id = 1' } });
+  assert.equal(r.isError, true);
+  assert.match(text(r), /not connected to a Hibira Approvals workspace/);
+  assert.match(text(r), /ABCD-1234/);
+  assert.equal((await ran(client)).length, before);
+  const read = await client.callTool({ name: 'execute_sql', arguments: { sql: 'SELECT 1' } });
+  assert.equal(text(read), 'ran: SELECT 1');
+});
+
+test('with a workspace connection, the assistant never gets the link', async () => {
+  const real = new ApprovalsClient({ appId: 'app_1', key: 'k', secret: 's', baseUrl: hibira.base });
+  const approvals = { notifiesMembers: true, create: (b) => real.create(b), get: (...a) => real.get(...a) };
+  const gate = new Gate({ upstream, approvals, label: 'shop-db', waitSeconds: 1 });
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await gate.createServer().connect(a);
+  const client = new Client({ name: 'c', version: '1' });
+  await client.connect(b);
+  const r = await client.callTool({ name: 'execute_sql', arguments: { sql: 'DELETE FROM orders WHERE id = 7' } });
+  assert.doesNotMatch(text(r), /https?:\/\//);
+  assert.match(text(r), /supervisor has been notified/);
+});
+
+test('--approvers is sent, and the answer names who approved', async () => {
+  const { client } = await connect({ approvers: ['dba', 'mei@example.tw'] });
+  const sql = "UPDATE orders SET status = 'refunded' WHERE id = 2001";
+  const call = client.callTool({ name: 'execute_sql', arguments: { sql } });
+  await new Promise((r) => setTimeout(r, 150));
+  const req = hibira.created.at(-1);
+  assert.deepEqual(req.body.approvers, ['dba', 'mei@example.tw']);
+  hibira.decide(req.id, 'Approve', undefined, { email: 'mei@example.tw', name: 'Mei Lin' });
+  const r = await call;
+  assert.match(text(r), /Approved by Mei Lin \(Approve\); ran once/);
+});
+
+test('a preset titles the approval and labels the service', async () => {
+  const { PRESETS } = await import('../src/presets.js');
+  const { client } = await connect({ preset: PRESETS.github, label: undefined, waitSeconds: 0 });
+  await client.callTool({ name: 'pause_project', arguments: { owner: 'acme', repo: 'shop' } });
+  const req = hibira.created.at(-1);
+  assert.equal(req.body.title, 'GitHub: pause project acme/shop');
+  assert.match(req.body.details, /^Service: GitHub/);
+});

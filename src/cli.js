@@ -11,7 +11,9 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { ApprovalsClient } from './hibira.js';
+import { ConnectingApprovals, DeviceLogin, TokenStore, WorkspaceClient, configPath, DEFAULT_URL } from './connect.js';
 import { Gate, VERSION } from './gate.js';
+import { preset as loadPreset, PRESETS } from './presets.js';
 
 const HELP = `Usage:
   mcp-approval-gate [options] -- <command> [args...]   wrap a local (stdio) database MCP server
@@ -21,15 +23,23 @@ const HELP = `Usage:
 Reads pass through. Calls that change data or schema wait for a supervisor's
 approval on a Hibira-hosted page (with push), then run once.
 
-Hibira app (from the Hibira portal; env only, never flags):
-  HIBIRA_APP_ID, HIBIRA_KEY, HIBIRA_SECRET   required
-  HIBIRA_API_URL                            default https://ws.hibira.io
+Connecting to Hibira Approvals (no keys to copy):
+  The first change that needs approval answers with a sign-in link and code.
+  Open it, pick the Approvals workspace whose members approve, and the gate
+  keeps a workspace token in ~/.config/hibira/approval-gate.json.
+  mcp-approval-gate login [--profile <name>]    connect now, from a terminal
+  mcp-approval-gate status | logout [--profile <name>]
+  HIBIRA_APPROVALS_TOKEN    a workspace token from the environment instead (servers, containers)
+  HIBIRA_APP_ID, HIBIRA_KEY, HIBIRA_SECRET   or a Hibira app's keys (as in 0.2)
+  HIBIRA_APPROVALS_URL      default https://approvals.hibira.io
 
 Options (each also as an env var, shown in brackets):
   --label <name>            name of the database on the approval page [GATE_LABEL]
+  --preset <name>           rules and titles for a known server: ${Object.keys(PRESETS).join(', ')} [GATE_PRESET]
   --mode <writes|all|none>  what waits: writes (default), every call, or nothing [GATE_MODE]
   --allow <tools>           comma-separated tools that never wait (* suffix ok) [GATE_ALLOW_TOOLS]
   --gate <tools>            comma-separated tools that always wait [GATE_TOOLS]
+  --approvers <list>        who may decide, in an Approvals workspace: group slugs or members' emails [GATE_APPROVERS]
   --push-interests <list>   send the approval link as a push to these interests [GATE_PUSH_INTERESTS]
   --push-users <list>       ...or to these user ids [GATE_PUSH_USERS]
   --channel <name>          also announce requests on this channel (approvals inbox) [GATE_CHANNEL]
@@ -44,6 +54,7 @@ Options (each also as an env var, shown in brackets):
   --port <n>                HTTP port (default 8787) [PORT]
   --host <addr>             HTTP bind address (default 127.0.0.1) [GATE_HOST]
   GATE_TOKEN                HTTP access token: Authorization: Bearer <token>, or the URL /mcp/<token>
+  --profile <name>          which saved connection to use (default "default") [GATE_PROFILE]
   --version, --help
 `;
 
@@ -83,16 +94,19 @@ function fail(msg) {
 }
 
 export function parse(argv, env) {
+  const sub = ['login', 'logout', 'status'].includes(argv[0]) ? argv[0] : undefined;
+  if (sub) argv = argv.slice(1);
   const dash = argv.indexOf('--');
   const own = dash === -1 ? argv : argv.slice(0, dash);
   const command = dash === -1 ? splitCommand(env.GATE_COMMAND ?? '') : argv.slice(dash + 1);
   const { values } = parseArgs({
     args: own,
     options: {
-      label: { type: 'string' }, mode: { type: 'string' }, allow: { type: 'string' }, gate: { type: 'string' },
-      'push-interests': { type: 'string' }, 'push-users': { type: 'string' }, channel: { type: 'string' },
+      label: { type: 'string' }, preset: { type: 'string' }, mode: { type: 'string' }, allow: { type: 'string' }, gate: { type: 'string' },
+      approvers: { type: 'string' }, 'push-interests': { type: 'string' }, 'push-users': { type: 'string' }, channel: { type: 'string' },
       options: { type: 'string' }, wait: { type: 'string' }, expires: { type: 'string' }, 'show-link': { type: 'string' },
       'upstream-url': { type: 'string' }, header: { type: 'string', multiple: true },
+      profile: { type: 'string' },
       http: { type: 'boolean' }, port: { type: 'string' }, host: { type: 'string' },
       version: { type: 'boolean' }, help: { type: 'boolean', short: 'h' },
     },
@@ -115,14 +129,16 @@ export function parse(argv, env) {
     return n;
   };
   const opts = {
-    help: values.help, version: values.version,
+    help: values.help, version: values.version, sub,
     command,
     upstreamUrl: values['upstream-url'] ?? env.GATE_UPSTREAM_URL,
     headers,
     label: values.label ?? env.GATE_LABEL,
+    preset: loadPreset(values.preset ?? env.GATE_PRESET),
     mode,
     allowTools: list(values.allow ?? env.GATE_ALLOW_TOOLS),
     gateTools: list(values.gate ?? env.GATE_TOOLS),
+    approvers: list(values.approvers ?? env.GATE_APPROVERS),
     pushInterests: list(values['push-interests'] ?? env.GATE_PUSH_INTERESTS),
     pushUsers: list(values['push-users'] ?? env.GATE_PUSH_USERS),
     channel: values.channel ?? env.GATE_CHANNEL,
@@ -134,10 +150,11 @@ export function parse(argv, env) {
     port: num(values.port ?? env.PORT, 8787, '--port', 1, 65535),
     host: values.host ?? env.GATE_HOST ?? '127.0.0.1',
     token: env.GATE_TOKEN,
+    profile: values.profile ?? env.GATE_PROFILE ?? 'default',
   };
   if (!['auto', 'always', 'never'].includes(opts.showLink)) throw new Error('--show-link must be auto, always or never');
   if (opts.pushInterests.length && opts.pushUsers.length) throw new Error('give --push-interests or --push-users, not both');
-  if (!opts.help && !opts.version && !opts.command.length && !opts.upstreamUrl) {
+  if (!opts.help && !opts.version && !opts.sub && !opts.command.length && !opts.upstreamUrl) {
     throw new Error('give the database MCP server to wrap after -- (or in GATE_COMMAND), or --upstream-url');
   }
   if (opts.command.length && opts.upstreamUrl) throw new Error('give a command after -- or --upstream-url, not both');
@@ -235,12 +252,24 @@ export async function main() {
     return;
   }
   const log = (msg) => process.stderr.write(`[approval-gate] ${msg}\n`);
+  const env = process.env;
+  const baseUrl = env.HIBIRA_APPROVALS_URL || DEFAULT_URL;
+  const store = new TokenStore(configPath(env));
+  if (opts.sub) return account(opts, store, baseUrl);
   let approvals;
   try {
-    approvals = new ApprovalsClient({
-      appId: process.env.HIBIRA_APP_ID, key: process.env.HIBIRA_KEY, secret: process.env.HIBIRA_SECRET,
-      baseUrl: process.env.HIBIRA_API_URL || undefined,
-    });
+    if (env.HIBIRA_APP_ID || env.HIBIRA_KEY || env.HIBIRA_SECRET) {
+      approvals = new ApprovalsClient({
+        appId: env.HIBIRA_APP_ID, key: env.HIBIRA_KEY, secret: env.HIBIRA_SECRET,
+        baseUrl: env.HIBIRA_API_URL || undefined,
+      });
+    } else if (env.HIBIRA_APPROVALS_TOKEN) {
+      approvals = new WorkspaceClient({ token: env.HIBIRA_APPROVALS_TOKEN, baseUrl });
+    } else {
+      approvals = new ConnectingApprovals({ store, profile: opts.profile, baseUrl, label: opts.label, log });
+      if (approvals.connected) log(`connected to Hibira Approvals workspace ${approvals.workspace?.name ?? ''}`.trimEnd());
+      else if (opts.http) approvals.connect().catch((err) => log(`could not start connecting: ${err.message}`));
+    }
   } catch (err) {
     fail(err.message);
   }
@@ -270,3 +299,24 @@ export async function main() {
   };
 }
 
+
+async function account(opts, store, baseUrl) {
+  const out = (m) => process.stdout.write(`${m}\n`);
+  const saved = store.get(opts.profile);
+  if (opts.sub === 'status') {
+    out(saved ? `Connected to Hibira Approvals workspace ${saved.workspace?.name ?? saved.workspace?.id ?? ''} (profile ${opts.profile}).` : `Not connected (profile ${opts.profile}).`);
+    return;
+  }
+  if (opts.sub === 'logout') {
+    store.set(opts.profile, undefined);
+    out(saved ? 'Disconnected on this machine. Revoke the gate in the workspace settings too if the token may have been copied.' : 'Nothing to disconnect.');
+    return;
+  }
+  const flow = new DeviceLogin({ baseUrl, label: opts.label });
+  const start = await flow.start();
+  out(`Open ${start.verification_uri_complete || start.verification_uri} and confirm the code ${start.user_code}.`);
+  out('Waiting for you to pick a workspace...');
+  const res = await flow.wait(start);
+  store.set(opts.profile, { token: res.access_token, workspace: res.workspace, url: baseUrl, connected_at: new Date().toISOString() });
+  out(`Connected to ${res.workspace?.name ?? 'the workspace'}. Approval requests from this machine now go to its members.`);
+}
