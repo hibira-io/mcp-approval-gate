@@ -87,7 +87,7 @@ test('a declined write never runs', async () => {
 });
 
 test('pending past the wait: answers with the link, check_approval runs it later', async () => {
-  const { client } = await connect({ waitSeconds: 0 });
+  const { client } = await connect({ waitSeconds: 0, pushInterests: [] });
   const sql = 'INSERT INTO t VALUES (7)';
   const r = await client.callTool({ name: 'execute_sql', arguments: { sql } });
   assert.ok(!r.isError);
@@ -137,4 +137,18 @@ test('when the approvals API fails, nothing runs', async () => {
   const r = await gate.callTool({ name: 'execute_sql', arguments: { sql: 'DROP TABLE x' } });
   assert.equal(r.isError, true);
   assert.match(text(r), /Could not ask for approval.*401/s);
+});
+
+test('with push or a channel, the assistant never gets the link', async () => {
+  for (const opts of [{ pushInterests: ['ops'] }, { pushInterests: [], channel: 'private-approvals' }]) {
+    const { client } = await connect({ waitSeconds: 0, ...opts });
+    const r = await client.callTool({ name: 'execute_sql', arguments: { sql: `DELETE FROM t WHERE id = ${Math.random()}` } });
+    assert.match(text(r), /supervisor has been notified/);
+    assert.doesNotMatch(text(r), /https?:\/\//);
+    assert.equal(r._meta['io.hibira/approval'].url, undefined);
+    assert.equal(hibira.created.at(-1).body.channel, opts.channel);
+  }
+  const { client } = await connect({ waitSeconds: 0, showLink: 'always' });
+  const r = await client.callTool({ name: 'execute_sql', arguments: { sql: 'DELETE FROM t WHERE id = 99' } });
+  assert.match(text(r), /Approval link: https:/);
 });
