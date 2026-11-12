@@ -1,0 +1,29 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.hibira/mcp-approval-gate",
+  "title": "Approval gate for databases",
+  "description": "Wraps a database MCP server: reads pass, writes wait for a supervisor to approve them.",
+  "version": "0.1.0",
+  "websiteUrl": "https://github.com/hibira-io/mcp-approval-gate",
+  "repository": { "url": "https://github.com/hibira-io/mcp-approval-gate", "source": "github" },
+  "icons": [
+    { "src": "https://hibira.io/portal/brand/icon-512.png", "mimeType": "image/png", "sizes": ["512x512"] }
+  ],
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@hibira-io/mcp-approval-gate",
+      "version": "0.1.0",
+      "transport": { "type": "stdio" },
+      "environmentVariables": [
+        { "name": "GATE_COMMAND", "description": "The database MCP server to wrap, e.g. npx -y @bytebase/dbhub --transport stdio --dsn postgres://user:pass@host/db", "isRequired": true, "isSecret": true },
+        { "name": "HIBIRA_APP_ID", "description": "Hibira app ID (hibira.io portal)", "isRequired": true },
+        { "name": "HIBIRA_KEY", "description": "Hibira app key", "isRequired": true },
+        { "name": "HIBIRA_SECRET", "description": "Hibira app secret", "isRequired": true, "isSecret": true },
+        { "name": "GATE_LABEL", "description": "The database's name on the approval page", "isRequired": false },
+        { "name": "GATE_PUSH_INTERESTS", "description": "Comma-separated push interests that receive approval requests", "isRequired": false },
+        { "name": "GATE_MODE", "description": "writes (default), all or none", "isRequired": false, "default": "writes", "choices": ["writes", "all", "none"] }
+      ]
+    }
+  ]
+}
