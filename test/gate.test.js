@@ -195,3 +195,12 @@ test('--approvers is sent, and the answer names who approved', async () => {
   const r = await call;
   assert.match(text(r), /Approved by Mei Lin \(Approve\); ran once/);
 });
+
+test('a preset titles the approval and labels the service', async () => {
+  const { PRESETS } = await import('../src/presets.js');
+  const { client } = await connect({ preset: PRESETS.github, label: undefined, waitSeconds: 0 });
+  await client.callTool({ name: 'pause_project', arguments: { owner: 'acme', repo: 'shop' } });
+  const req = hibira.created.at(-1);
+  assert.equal(req.body.title, 'GitHub: pause project acme/shop');
+  assert.match(req.body.details, /^Service: GitHub/);
+});

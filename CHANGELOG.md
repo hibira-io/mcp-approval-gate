@@ -12,6 +12,8 @@
   or members, and the answer names who approved ("Approved by Mei Lin").
 - `mcp-approval-gate login | status | logout`, `--profile` / `GATE_PROFILE`,
   and `HIBIRA_APPROVALS_TOKEN` for servers and containers.
+- `--preset stripe|github|gmail|shopify`: which tools of those servers only
+  read, which wait, and plain approval titles. Patterns may now be `*suffix`.
 - A Hibira app's `HIBIRA_APP_ID` / `HIBIRA_KEY` / `HIBIRA_SECRET` still work.
 
 ## 0.2.0

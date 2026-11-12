@@ -161,6 +161,39 @@ terminal to sign in from, pass the workspace token as
 after `login` on any machine), or watch the gate's log for the connect link
 on first start.
 
+## Beyond databases: presets
+
+The gate works in front of any MCP server. For a few common ones, `--preset`
+knows which tools only read and which change something, and gives the
+approval a plain title such as "Stripe: POST /v1/refunds" or "GitHub: merge
+pull request acme/shop#42". `--allow` and `--gate` still win over a preset.
+
+| Preset | Waits for approval | Runs right away |
+| --- | --- | --- |
+| `stripe` | `stripe_api_write`, `send_money`, `transfer_money`, `convert_currency`, ... | `stripe_api_read`, search, docs, analytics |
+| `github` | merges, pushes, file changes, new repos, workflow runs, comments | `get_*`, `list_*`, `search_*`, `*_read` |
+| `gmail` | sending, replying, forwarding, deleting, filters | reading, searching, drafts |
+| `shopify` | `graphql_mutation`, creating, updating, discounts, inventory | queries, analytics, docs |
+
+**Stripe** (hosted server, with an agent API key):
+
+```sh
+claude mcp add stripe -- npx -y @hibira-io/mcp-approval-gate --preset stripe \
+  --upstream-url https://mcp.stripe.com --header 'Authorization: Bearer ${STRIPE_AGENT_KEY}'
+```
+
+**GitHub** (official server in Docker):
+
+```sh
+claude mcp add github -e GITHUB_PERSONAL_ACCESS_TOKEN=... \
+  -- npx -y @hibira-io/mcp-approval-gate --preset github \
+  -- docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN ghcr.io/github/github-mcp-server
+```
+
+For Gmail and Shopify, put `--preset gmail` or `--preset shopify` in front of
+the server you already use. Tools a preset does not know follow the usual
+rules below.
+
 ## What the assistant sees
 
 A write call waits up to 50 seconds (`--wait`) for the decision, sending
@@ -216,6 +249,7 @@ user only the rights it needs too.
 | | `HIBIRA_APP_ID`, `HIBIRA_KEY`, `HIBIRA_SECRET` | | a Hibira app's keys instead, as in 0.2 (push and channel options apply to these) |
 | | `HIBIRA_API_URL` | `https://ws.hibira.io` | |
 | `--label` | `GATE_LABEL` | `database` | the database's name on the approval page |
+| `--preset` | `GATE_PRESET` | | `stripe`, `github`, `gmail` or `shopify` (see above) |
 | `--mode` | `GATE_MODE` | `writes` | `writes`, `all` or `none` |
 | `--allow` | `GATE_ALLOW_TOOLS` | | tools that never wait |
 | `--gate` | `GATE_TOOLS` | | tools that always wait |

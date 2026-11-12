@@ -13,6 +13,7 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { ApprovalsClient } from './hibira.js';
 import { ConnectingApprovals, DeviceLogin, TokenStore, WorkspaceClient, configPath, DEFAULT_URL } from './connect.js';
 import { Gate, VERSION } from './gate.js';
+import { preset as loadPreset, PRESETS } from './presets.js';
 
 const HELP = `Usage:
   mcp-approval-gate [options] -- <command> [args...]   wrap a local (stdio) database MCP server
@@ -34,6 +35,7 @@ Connecting to Hibira Approvals (no keys to copy):
 
 Options (each also as an env var, shown in brackets):
   --label <name>            name of the database on the approval page [GATE_LABEL]
+  --preset <name>           rules and titles for a known server: ${Object.keys(PRESETS).join(', ')} [GATE_PRESET]
   --mode <writes|all|none>  what waits: writes (default), every call, or nothing [GATE_MODE]
   --allow <tools>           comma-separated tools that never wait (* suffix ok) [GATE_ALLOW_TOOLS]
   --gate <tools>            comma-separated tools that always wait [GATE_TOOLS]
@@ -100,7 +102,7 @@ export function parse(argv, env) {
   const { values } = parseArgs({
     args: own,
     options: {
-      label: { type: 'string' }, mode: { type: 'string' }, allow: { type: 'string' }, gate: { type: 'string' },
+      label: { type: 'string' }, preset: { type: 'string' }, mode: { type: 'string' }, allow: { type: 'string' }, gate: { type: 'string' },
       approvers: { type: 'string' }, 'push-interests': { type: 'string' }, 'push-users': { type: 'string' }, channel: { type: 'string' },
       options: { type: 'string' }, wait: { type: 'string' }, expires: { type: 'string' }, 'show-link': { type: 'string' },
       'upstream-url': { type: 'string' }, header: { type: 'string', multiple: true },
@@ -132,6 +134,7 @@ export function parse(argv, env) {
     upstreamUrl: values['upstream-url'] ?? env.GATE_UPSTREAM_URL,
     headers,
     label: values.label ?? env.GATE_LABEL,
+    preset: loadPreset(values.preset ?? env.GATE_PRESET),
     mode,
     allowTools: list(values.allow ?? env.GATE_ALLOW_TOOLS),
     gateTools: list(values.gate ?? env.GATE_TOOLS),
