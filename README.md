@@ -240,6 +240,96 @@ the gate off (useful while testing).
 The gate is a second pair of eyes, not a permission system. Give the database
 user only the rights it needs too.
 
+## Coding agents: approval before risky shell commands
+
+The same package is a hook for **Claude Code, Codex and Cursor**. Shell
+commands that are hard to take back wait until a second person in your Hibira
+Approvals workspace approves them; everything else runs as usual.
+
+| Waits for approval | Examples |
+|---|---|
+| Deleting files | `rm -rf src`, `find . -delete`, `git clean -fdx` (not `rm -rf node_modules`, `dist`, `build`, ...) |
+| Rewriting git history | `git push --force`, `git reset --hard`, `git branch -D`, deleting remote branches |
+| Deploys and releases | `vercel --prod`, `fly deploy`, `wrangler deploy`, `firebase deploy`, `gh pr merge`, `npm run deploy`, `make release` |
+| Infrastructure | `terraform apply` / `destroy`, `pulumi up`, `cdk deploy`, `kubectl delete` / `apply`, `helm upgrade`, `aws ... delete-*` |
+| Publishing | `npm publish`, `cargo publish`, `twine upload`, `docker push`, `gh release create` |
+| Databases | `psql -c "DELETE ..."`, SQL heredocs and files, `prisma migrate deploy`, `artisan migrate --force`, `redis-cli FLUSHALL` |
+
+Commands are read the way a shell reads them (`&&`, pipes, `$( )`, heredocs),
+and wrappers such as `sudo`, `env`, `bash -c`, `ssh host '...'`, `npx` and
+`uv run` are looked through. SQL is classified like the MCP gate: a
+`psql -c "select ..."` runs, a `DELETE` waits. Check any command with
+`npx -y @hibira-io/mcp-approval-gate hook check -- terraform apply`.
+
+The request shows the full command, why it waits, the folder, repository and
+branch, and the computer. Approvers get it on their phones; the agent never
+gets the link, so it cannot approve itself. An approval lets that exact
+command run once in that folder. A rejection (with its comment) goes back to
+the agent with an instruction to stop; if nobody answers within 10 minutes the
+agent is told to wait and run the same command again later.
+
+Commands are checked on your computer: only the ones that wait create a
+request (and count toward the workspace's monthly requests). When the month's
+requests are used up, risky commands stay blocked and the agent says why;
+nothing is let through unasked.
+
+**Install.** Connect this computer to your workspace once:
+
+```sh
+npx -y @hibira-io/mcp-approval-gate login --label "coding agent"
+```
+
+Then add the hook. With the [Hibira agent plugin](https://github.com/hibira-io/agent-plugin)
+marketplace: `claude plugin install hibira-approval-hooks@hibira` (Codex and
+Cursor install the same plugin). Or add it by hand:
+
+- **Claude Code**, `~/.claude/settings.json` (or the project's `.claude/settings.json`):
+
+  ```json
+  { "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": [
+    { "type": "command", "command": "npx -y @hibira-io/mcp-approval-gate hook claude", "timeout": 660 }
+  ] } ] } }
+  ```
+
+- **Codex**, `~/.codex/hooks.json` (then trust it with `/hooks`):
+
+  ```json
+  { "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": [
+    { "type": "command", "command": "npx -y @hibira-io/mcp-approval-gate hook codex", "timeout": 660 }
+  ] } ] } }
+  ```
+
+- **Cursor**, `~/.cursor/hooks.json`:
+
+  ```json
+  { "version": 1, "hooks": { "beforeShellExecution": [
+    { "command": "npx -y @hibira-io/mcp-approval-gate hook cursor", "timeout": 660, "failClosed": true }
+  ] } }
+  ```
+
+For a faster start on every command, install it once with
+`npm install -g @hibira-io/mcp-approval-gate` and use
+`mcp-approval-gate hook claude` as the command.
+
+**Settings** go in `~/.config/hibira/approval-hook.json` or the environment:
+
+```json
+{
+  "always": ["^\\./scripts/ship\\.sh"],
+  "never": ["^terraform apply .*-target=module\\.sandbox"],
+  "approvers": ["platform-team"],
+  "wait": 600,
+  "expires": 30
+}
+```
+
+`GATE_HOOK=off` turns it off for one shell. A project can add its own
+`always` rules and `approvers` in `.hibira/approval-hook.json` (it cannot add
+`never` rules, so an agent cannot switch its own checks off by editing the
+repository). This is a safety net against honest mistakes, not a sandbox: a
+determined agent can disguise a command, so keep production credentials out
+of the agent's reach as well.
+
 ## Options
 
 | Flag | Env | Default | |
@@ -296,3 +386,4 @@ MIT
 - Gate 跑在你自己的环境，Hibira 只经手审批内容，不碰数据库密码，也看不到查询结果。
 - Claude（Desktop / Code / claude.ai）、Cursor、ChatGPT 都能用；网页端用 `--http` 加 `GATE_TOKEN`。
 - 设定：在 hibira.io 建立 Approvals 工作区并邀请审批人；设定里只要在 `--` 后面接原本的数据库 MCP 指令，不用复制任何 Key。第一次要写入时，助手会给一个连接链接和代码，由工作区管理员登入后按「连接」即可（也可先执行 `npx -y @hibira-io/mcp-approval-gate login`）。
+- **编码代理审批钩子（Claude Code / Codex / Cursor）**：同一个套件也是 agent 的 hook。删档（`rm -rf`）、`git push --force`、部署（`vercel --prod`、`fly deploy`、`wrangler deploy`）、`terraform apply`、发包（`npm publish`）、数据库写入等不可逆的 shell 指令，会先送到 Approvals 工作区等另一个人核准，核准后只放行那一次；其他指令照常执行。先执行一次 `npx -y @hibira-io/mcp-approval-gate login --label "coding agent"`，再装 agent-plugin 里的 `hibira-approval-hooks` 插件（或照上面手动加 hook）。

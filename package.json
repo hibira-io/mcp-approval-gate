@@ -1,8 +1,8 @@
 {
   "name": "@hibira-io/mcp-approval-gate",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "mcpName": "io.hibira/mcp-approval-gate",
-  "description": "Supervisor approval for database MCP servers: wrap DBHub, postgres-mcp or Supabase MCP so reads pass through and writes wait for another person to approve them on a hosted page, with push",
+  "description": "Supervisor approval for AI agents: wrap a database MCP server so writes wait for another person, and hook Claude Code, Codex and Cursor so risky shell commands (rm -rf, force push, deploys, terraform apply, DB writes) wait for approval in Hibira Approvals",
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -22,7 +22,14 @@
     "claude",
     "cursor",
     "chatgpt",
-    "hibira"
+    "hibira",
+    "claude-code",
+    "codex",
+    "cursor-hooks",
+    "hooks",
+    "pretooluse",
+    "coding-agent",
+    "guardrails"
   ],
   "homepage": "https://hibira.io",
   "bugs": {
