@@ -2,7 +2,8 @@
 
 ## 0.4.0
 
-- `mcp-approval-gate hook claude|codex|cursor`: a hook for coding agents.
+- `mcp-approval-gate hook claude|codex|cursor|hermes`: a hook for coding agents
+  (Hermes Agent: the `terminal` tool through a `pre_tool_call` shell hook).
   Shell commands that delete files, rewrite git history, deploy, change
   infrastructure, publish packages or write to a database wait for a second
   person in the Hibira Approvals workspace; everything else runs as usual.

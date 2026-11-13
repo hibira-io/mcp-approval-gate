@@ -1,5 +1,6 @@
 // mcp-approval-gate hook: a command hook for coding agents (Claude Code
-// PreToolUse, Codex PreToolUse, Cursor beforeShellExecution). Risky shell
+// PreToolUse, Codex PreToolUse, Cursor beforeShellExecution, Hermes Agent
+// pre_tool_call). Risky shell
 // commands wait until a second person approves them in a Hibira Approvals
 // workspace; everything else runs as usual.
 
@@ -12,12 +13,13 @@ import { classifyShell } from './shell.js';
 import { ApprovalsClient } from './hibira.js';
 import { TokenStore, WorkspaceClient, configPath, DEFAULT_URL } from './connect.js';
 
-export const AGENTS = { claude: 'Claude Code', codex: 'Codex', cursor: 'Cursor' };
+export const AGENTS = { claude: 'Claude Code', codex: 'Codex', cursor: 'Cursor', hermes: 'Hermes Agent' };
 const LOGIN = 'npx -y @hibira-io/mcp-approval-gate login --label "coding agent"';
 const REJECT_MEMORY_MS = 15 * 60 * 1000;
+const HERMES_MAX_WAIT = 280;
 
 const HELP = `Usage:
-  mcp-approval-gate hook [claude|codex|cursor]   run as the agent's hook (reads the hook JSON on stdin)
+  mcp-approval-gate hook [claude|codex|cursor|hermes]   run as the agent's hook (reads the hook JSON on stdin)
   mcp-approval-gate hook check -- <command...>   show whether a command would wait for approval
 
 Shell commands that delete files, force-push, deploy, change infrastructure,
@@ -33,6 +35,7 @@ Settings (env, or ~/.config/hibira/approval-hook.json with the keys in brackets)
   GATE_HOOK_WAIT                 seconds to wait for an answer, default 600 [wait]
   GATE_EXPIRES_MINUTES           how long a request stays open, default 30 [expires]
   GATE_PROFILE                   which connected workspace to use, default "default" [profile]
+  GATE_LOGIN_COMMAND             the connect command the agent tells the user to run (containers)
 A project can add rules (never remove them) in .hibira/approval-hook.json: { "always": [...], "approvers": [...] }.
 `;
 
@@ -66,6 +69,7 @@ export function loadSettings(env = process.env, cwd = process.cwd()) {
     pushInterests: (env.GATE_PUSH_INTERESTS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
     pushUsers: (env.GATE_PUSH_USERS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
     channel: env.GATE_CHANNEL || undefined,
+    login: env.GATE_LOGIN_COMMAND || LOGIN,
   };
 }
 
@@ -86,14 +90,15 @@ export function readInput(input, client) {
   if (!input || typeof input !== 'object') return {};
   let agent = client;
   if (!agent) {
-    if (input.hook_event_name === 'beforeShellExecution' || (typeof input.command === 'string' && !input.tool_name)) agent = 'cursor';
+    if (input.hook_event_name === 'pre_tool_call') agent = 'hermes';
+    else if (input.hook_event_name === 'beforeShellExecution' || (typeof input.command === 'string' && !input.tool_name)) agent = 'cursor';
     else if ('turn_id' in input) agent = 'codex';
     else agent = 'claude';
   }
   if (agent === 'cursor') {
     return { agent, command: typeof input.command === 'string' ? input.command : undefined, cwd: input.cwd || process.cwd() };
   }
-  const shellTool = /^(Bash|Shell|shell|exec_command|local_shell|run_terminal_cmd)$/.test(input.tool_name ?? '');
+  const shellTool = /^(Bash|Shell|shell|exec_command|local_shell|run_terminal_cmd|terminal)$/.test(input.tool_name ?? '');
   let command = input.tool_input?.command;
   if (Array.isArray(command)) command = command.join(' ');
   return {
@@ -109,6 +114,7 @@ export function render(agent, { kind, reason, userMessage }) {
     if (kind === 'deny') return { permission: 'deny', user_message: userMessage ?? reason, agent_message: reason };
     return kind === 'approved' ? { permission: 'allow', user_message: userMessage } : { permission: 'allow' };
   }
+  if (agent === 'hermes') return kind === 'deny' ? { action: 'block', message: reason } : undefined;
   if (kind === 'pass') return undefined;
   if (kind === 'approved') return userMessage ? { systemMessage: userMessage } : undefined;
   const out = { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason } };
@@ -207,6 +213,7 @@ function answeredBy(res) {
 export async function decideHook({ agent, command, cwd }, deps) {
   const { settings } = deps;
   if (!command || !settings.enabled) return { kind: 'pass' };
+  const login = settings.login ?? LOGIN;
   const verdict = classifyShell(command, settings);
   if (!verdict.gate) return { kind: 'pass' };
   const what = shorten(verdict.reasons.map((r) => r.label).join('; '), 160);
@@ -215,9 +222,9 @@ export async function decideHook({ agent, command, cwd }, deps) {
     return {
       kind: 'deny',
       reason: `This command needs a second person's approval (${what}), but this computer is not connected to a Hibira Approvals workspace yet. ` +
-        `Ask the user to run \`${LOGIN}\` in a terminal, or run it yourself in the background and show the user the link and code it prints. ` +
+        `Ask the user to run \`${login}\` in a terminal, or run it yourself in the background and show the user the link and code it prints. ` +
         'Once it says connected, run the same command again. Do not try another way to do the same thing.',
-      userMessage: `Hibira Approvals: "${shorten(command, 80)}" needs approval. Connect this computer first: ${LOGIN}`,
+      userMessage: `Hibira Approvals: "${shorten(command, 80)}" needs approval. Connect this computer first: ${login}`,
     };
   }
   const fp = createHash('sha256').update(JSON.stringify([cwd, command])).digest('hex');
@@ -234,7 +241,7 @@ export async function decideHook({ agent, command, cwd }, deps) {
       created = await approvals.create(requestBody({ agent, command, cwd, verdict, settings, git: deps.git }));
     } catch (err) {
       if (err.status === 401) {
-        return { kind: 'deny', reason: `Hibira Approvals refused this computer's sign-in (it may have been disconnected). Ask the user to run \`${LOGIN}\` again, then retry the same command.` };
+        return { kind: 'deny', reason: `Hibira Approvals refused this computer's sign-in (it may have been disconnected). Ask the user to run \`${login}\` again, then retry the same command.` };
       }
       if (err.status === 402) {
         return {
@@ -337,6 +344,8 @@ export async function runHook(argv, env = process.env) {
     const input = readInput(JSON.parse(await readStdin()), client);
     agent = input.agent ?? agent;
     const settings = loadSettings(env, input.cwd);
+    // Hermes stops a hook after 300 seconds at most; answer before that.
+    if (agent === 'hermes') settings.waitSeconds = Math.min(settings.waitSeconds, HERMES_MAX_WAIT);
     const needs = input.command && settings.enabled && classifyShell(input.command, settings).gate;
     const decision = needs
       ? await decideHook(input, { settings, approvals: approvalsFromEnv(env, settings), state: new State(statePath(env)) })
