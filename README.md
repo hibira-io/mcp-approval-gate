@@ -55,7 +55,7 @@ front of them.
 
 ## Setup
 
-1. Create a **Hibira Approvals workspace** at [approvals.hibira.io](https://approvals.hibira.io)
+1. Create a **Hibira Approvals workspace** at [hibira.io/portal/approvals](https://hibira.io/portal/approvals)
    and invite the people who approve (store managers, DBAs, ...). They get
    requests on their phones and decide in the approvals inbox.
 2. Put the gate in front of your database MCP server in your client's config
