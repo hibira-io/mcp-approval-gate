@@ -6,7 +6,17 @@ import { mkdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
 import { homedir, hostname } from 'node:os';
 import { dirname, join } from 'node:path';
 
-export const DEFAULT_URL = 'https://approvals.hibira.io';
+export const DEFAULT_URL = 'https://api.hibira.io/approvals';
+
+/**
+ * The gate's API under a base URL: https://api.hibira.io/approvals/gate, or
+ * /api/v1/gate on a bare host such as https://approvals.hibira.io (older
+ * settings and saved tokens, which keep working).
+ */
+export function gateUrl(baseUrl) {
+  const base = String(baseUrl).replace(/\/+$/, '');
+  return new URL(base).pathname.replace(/\/+$/, '') ? `${base}/gate` : `${base}/api/v1/gate`;
+}
 
 /** Where tokens are kept: $HIBIRA_CONFIG_DIR, $XDG_CONFIG_HOME/hibira or ~/.config/hibira. */
 export function configPath(env = process.env) {
@@ -71,12 +81,12 @@ export class WorkspaceClient {
   }
 
   create(body) {
-    return call(this.fetch, `${this.baseUrl}/api/v1/gate/requests`, { method: 'POST', token: this.token, body });
+    return call(this.fetch, `${gateUrl(this.baseUrl)}/requests`, { method: 'POST', token: this.token, body });
   }
 
   get(id, waitSeconds = 0, signal) {
     const qs = waitSeconds > 0 ? `?wait=${Math.min(25, Math.floor(waitSeconds))}` : '';
-    return call(this.fetch, `${this.baseUrl}/api/v1/gate/requests/${encodeURIComponent(id)}${qs}`, { token: this.token, signal });
+    return call(this.fetch, `${gateUrl(this.baseUrl)}/requests/${encodeURIComponent(id)}${qs}`, { token: this.token, signal });
   }
 }
 
@@ -90,7 +100,7 @@ export class DeviceLogin {
   }
 
   start() {
-    return call(this.fetch, `${this.baseUrl}/api/v1/gate/device`, {
+    return call(this.fetch, `${gateUrl(this.baseUrl)}/device`, {
       method: 'POST',
       body: { client: 'mcp-approval-gate', label: this.label || 'database', host: hostname().slice(0, 100) },
     });
@@ -104,7 +114,7 @@ export class DeviceLogin {
       if (signal?.aborted) throw new Error('cancelled');
       await this.sleep(interval);
       try {
-        return await call(this.fetch, `${this.baseUrl}/api/v1/gate/token`, {
+        return await call(this.fetch, `${gateUrl(this.baseUrl)}/token`, {
           method: 'POST', body: { device_code: start.device_code }, signal,
         });
       } catch (err) {

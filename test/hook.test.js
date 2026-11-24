@@ -21,7 +21,7 @@ function fakeApprovals(answers, { notifies = true } = {}) {
   return {
     calls,
     notifiesMembers: notifies,
-    async create(body) { calls.create.push(body); return { approval_id: `apr_${calls.create.length}`, url: 'https://approvals.hibira.io/r/x', status: 'pending', expires_at: new Date(Date.now() + 1800e3).toISOString() }; },
+    async create(body) { calls.create.push(body); return { approval_id: `apr_${calls.create.length}`, url: 'https://approvals.hibira.io/approve/apr_1/x', status: 'pending', expires_at: new Date(Date.now() + 1800e3).toISOString() }; },
     async get(id, wait) { calls.get.push([id, wait]); return answers.shift() ?? { status: 'pending' }; },
   };
 }

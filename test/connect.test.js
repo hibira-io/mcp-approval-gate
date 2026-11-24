@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, statSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ConnectingApprovals, DeviceLogin, TokenStore, WorkspaceClient, configPath } from '../src/connect.js';
+import { ConnectingApprovals, DEFAULT_URL, DeviceLogin, TokenStore, WorkspaceClient, configPath, gateUrl } from '../src/connect.js';
 
 // A fake Hibira: the device flow answers "pending" until approve() is called.
 function fakeHibira() {
@@ -16,7 +16,7 @@ function fakeHibira() {
     calls.push({ method: init.method ?? 'GET', path: u.pathname + u.search, body, auth: init.headers?.Authorization });
     const json = (status, data) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
     if (u.pathname === '/api/v1/gate/device') {
-      return json(200, { device_code: 'dev_1', user_code: 'ABCD-1234', verification_uri: 'https://approvals.hibira.io/connect', verification_uri_complete: 'https://approvals.hibira.io/connect?code=ABCD-1234', interval: 1, expires_in: 600 });
+      return json(200, { device_code: 'dev_1', user_code: 'ABCD-1234', verification_uri: 'https://hibira.io/portal/approvals/connect', verification_uri_complete: 'https://hibira.io/portal/approvals/connect?code=ABCD-1234', interval: 1, expires_in: 600 });
     }
     if (u.pathname === '/api/v1/gate/token') {
       if (!approved) return json(400, { error: 'authorization_pending' });
@@ -107,4 +107,11 @@ test('a revoked token is forgotten', async () => {
   assert.equal(err.status, 401);
   assert.equal(a.connected, false);
   assert.equal(store.get('default'), undefined);
+});
+
+test('gateUrl: api.hibira.io/approvals/gate by default, /api/v1/gate on a bare host', () => {
+  assert.equal(gateUrl(DEFAULT_URL), 'https://api.hibira.io/approvals/gate');
+  assert.equal(gateUrl('https://api.hibira.io/approvals/'), 'https://api.hibira.io/approvals/gate');
+  assert.equal(gateUrl('https://approvals.hibira.io'), 'https://approvals.hibira.io/api/v1/gate');
+  assert.equal(gateUrl('https://approvals.hibira.io/'), 'https://approvals.hibira.io/api/v1/gate');
 });
