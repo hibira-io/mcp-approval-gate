@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1
+
+- The gate talks to Hibira Approvals at https://api.hibira.io/approvals by
+  default. `HIBIRA_APPROVALS_URL=https://approvals.hibira.io` and tokens saved
+  by older versions keep working (the old address still answers).
+
 ## 0.4.0
 
 - `mcp-approval-gate hook claude|codex|cursor|hermes`: a hook for coding agents

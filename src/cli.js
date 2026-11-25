@@ -31,7 +31,7 @@ Connecting to Hibira Approvals (no keys to copy):
   mcp-approval-gate status | logout [--profile <name>]
   HIBIRA_APPROVALS_TOKEN    a workspace token from the environment instead (servers, containers)
   HIBIRA_APP_ID, HIBIRA_KEY, HIBIRA_SECRET   or a Hibira app's keys (as in 0.2)
-  HIBIRA_APPROVALS_URL      default https://approvals.hibira.io
+  HIBIRA_APPROVALS_URL      default https://api.hibira.io/approvals
 
 Options (each also as an env var, shown in brackets):
   --label <name>            name of the database on the approval page [GATE_LABEL]
